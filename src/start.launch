@@ -1,5 +1,5 @@
 <launch>
-    <include file="$(find turtlebot_bringup)/launch/minimal.launch"/>
-    <include file="$(find openni_launch)/launch/openni.launch"/>
-    <include file="$(find sound_play)/soundplay_node.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/openni_simulator.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/world_state.launch"/>
 </launch>

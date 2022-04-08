@@ -1,0 +1,9 @@
+<launch>
+    <!--Simulator-->
+    <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/openni_simulator.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/world_state.launch"/>
+
+    <!--Nodes-->
+    <node pkg="vision" name="obstacle_detector" type="obstacle_detector.py"/>
+</launch>

@@ -14,7 +14,7 @@ def vector_norm(x, y):
 def dot_product(x0, y0, x1, y1):
     return x0 * x1 + y0 * y1
 
-def vector_angle(x0, y0, x1, y1):    
+def vector_angle(x0, y0, x1, y1):
     dot = dot_product(x0, y0, x1, y1)
     det = x0 * y1 - y0 * x1
     return atan2(det, dot) 
@@ -162,16 +162,18 @@ class Movement:
 if __name__ == '__main__':
     mov = Movement() 
     
-    rospy.sleep(0.3)
+    rospy.sleep(0.3) 
+    args = []
     
-    rate = rospy.Rate(10)
-    mov.move_robot_to_destiny([[1, 2, 0],
-                               [2, 2, 3 / 2 * pi],
-                               [2, 1, pi],
-                               [0, 0, pi / 2]])
-    # # mov.apply_velocity(
-    #     [0.5], # 0, 2, 4] ,
-    #     [0], # 3.14159, 0, -0.2],   
-    #     [5.1] # 1, 4, 3] 
-    # )
+    lap = [[1, 2, 0],
+            [2, 2, 3 / 2 * pi],
+            [2, 1, pi],
+            [0, 0, pi / 2]]
+    
+    # We do three laps
+    for _ in range(3):
+        args += lap.copy()
+
+    
+    mov.move_robot_to_destiny(args)
     rospy.spin()   

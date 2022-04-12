@@ -53,7 +53,7 @@ class RobotPose:
         return f"<{self.x}, {self.y}, {self.theta}>"
         
 
-class Movement:
+class DeadReckoningNav:
     
     RATE_HZ = 20 
     
@@ -160,7 +160,7 @@ class Movement:
         #rospy.loginfo(f'Real pose - lin: ({x}, {y}, {z}) ang: ({roll}, {pitch}, {yaw})')
 
 if __name__ == '__main__':
-    mov = Movement() 
+    nav = DeadReckoningNav() 
     
     rospy.sleep(0.3) 
     args = []
@@ -175,5 +175,5 @@ if __name__ == '__main__':
         args += lap.copy()
 
     
-    mov.move_robot_to_destiny(args)
+    nav.move_robot_to_destiny(args)
     rospy.spin()   

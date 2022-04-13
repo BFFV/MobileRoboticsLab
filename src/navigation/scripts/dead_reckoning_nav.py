@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import Twist, Pose
+from geometry_msgs.msg import Twist, Pose, PoseArray
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
 
@@ -65,10 +65,9 @@ class DeadReckoningNav:
         self.odom_sub = rospy.Subscriber( '/odom', Odometry, self.odometry_cb )
         self.real_pose_sub = rospy.Subscriber('/real_pose', Pose, self.real_pose_cb)
         self.rate = rospy.Rate(self.RATE_HZ)
+        self.pose_sub = None
         self.initial_pose = RobotPose(1, 1, 0)
         self.current_pose = self.initial_pose
-        
-        rospy.loginfo("Not really working %d", 48)
     
     def apply_velocity(self, lin_vel_list, ang_vel_list, time_list):
         args = zip(lin_vel_list, ang_vel_list, time_list)
@@ -76,11 +75,12 @@ class DeadReckoningNav:
         for lin_vel, ang_vel, time in args:
             initial_time = rospy.Time.now().to_sec()
             current_time = initial_time
+            
+            # Loop in short steps to prevent velocity limit
             while current_time < initial_time + time:
                 speed = Twist()
                 speed.linear.x = lin_vel
                 speed.angular.z = ang_vel 
-                # rospy.loginfo('Applied Speeds of (%f, %f)' % (lin_vel, ang_vel))
                 self.cmd_vel_mux_pub.publish(speed)
                 self.rate.sleep()
                 current_time = rospy.Time.now().to_sec()
@@ -158,22 +158,30 @@ class DeadReckoningNav:
                                                     odom.orientation.z,
                                                     odom.orientation.w ) )
         #rospy.loginfo(f'Real pose - lin: ({x}, {y}, {z}) ang: ({roll}, {pitch}, {yaw})')
+        
+        
+    def goal_pose_cb(self, pose_array):
+        
+        def transform(pose):
+            x = pose.position.x
+            y = pose.position.y
+            w = pose.orientation.w
+            return (x, y, w)
+            
+            
+        pose_list = [ transform(pose) for pose in pose_array.poses ]
+        
+        self.move_robot_to_destiny(pose_list)
+        
+        
+        
+    def listen_and_spin(self):
+        self.pose_sub = rospy.Subscriber('/goal_list', PoseArray, self.goal_pose_cb)
+        
 
 if __name__ == '__main__':
-    nav = DeadReckoningNav() 
-    
-    rospy.sleep(0.3) 
-    args = []
-    
-    lap = [[1, 2, 0],
-            [2, 2, 3 / 2 * pi],
-            [2, 1, pi],
-            [0, 0, pi / 2]]
-    
-    # We do three laps
-    for _ in range(3):
-        args += lap.copy()
-
-    
-    nav.move_robot_to_destiny(args)
+    nav = DeadReckoningNav()
+    # Prevent missing log messages by waiting a small amount
+    rospy.sleep(0.3)
+    nav.listen_and_spin()
     rospy.spin()   

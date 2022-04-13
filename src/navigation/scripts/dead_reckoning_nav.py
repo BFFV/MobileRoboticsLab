@@ -57,7 +57,7 @@ class RobotPose:
 
 class DeadReckoningNav:
     
-    RATE_HZ = 20 
+    RATE_HZ = 40
     
     def __init__(self):
         rospy.init_node('movement', anonymous=True)
@@ -83,10 +83,10 @@ class DeadReckoningNav:
         
         for lin_vel, ang_vel, time, expected_pos in args:
             initial_time = rospy.Time.now().to_sec()
-            current_time = initial_time
+            current_time = initial_time 
             
             # Loop in short steps to prevent velocity limit
-            while current_time < initial_time + time:
+            while current_time < initial_time + time * 1.1:
                 speed = Twist()
                 speed.linear.x = lin_vel
                 speed.angular.z = ang_vel 

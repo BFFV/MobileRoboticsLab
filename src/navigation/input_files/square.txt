@@ -1,4 +1,4 @@
-# Square Trajectory, repeated three times
+# Square Trajectory, repeated three times. Assuming start at pos (1, 1)
 
 # Go up and point right
 1 2 0 

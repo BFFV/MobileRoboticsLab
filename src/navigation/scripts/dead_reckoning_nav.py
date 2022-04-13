@@ -1,11 +1,13 @@
 #!/usr/bin/env python
+from time import time
+from copy import copy
+from math import atan2, pi, sin, cos
 
 import rospy
 from geometry_msgs.msg import Twist, Pose, PoseArray
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
 
-from math import atan2, pi, sin, cos
 
 
 def vector_norm(x, y):
@@ -62,17 +64,24 @@ class DeadReckoningNav:
         self.max_v = 2 # [m/s]
         self.max_w = 5 # [rad/s]
         self.cmd_vel_mux_pub = rospy.Publisher('/yocs_cmd_vel_mux/input/navigation', Twist, queue_size = 10)
+        self.position_diff_pub = rospy.Publisher('/position_diff', PoseArray, queue_size=10)
         self.odom_sub = rospy.Subscriber( '/odom', Odometry, self.odometry_cb )
         self.real_pose_sub = rospy.Subscriber('/real_pose', Pose, self.real_pose_cb)
         self.rate = rospy.Rate(self.RATE_HZ)
         self.pose_sub = None
         self.initial_pose = RobotPose(1, 1, 0)
         self.current_pose = self.initial_pose
-    
-    def apply_velocity(self, lin_vel_list, ang_vel_list, time_list):
-        args = zip(lin_vel_list, ang_vel_list, time_list)
         
-        for lin_vel, ang_vel, time in args:
+        # Attrs for correctly reporting the current position
+        self.last_real_pose = None
+        self.last_real_pose_time = None
+        self.last_odom_pose = None
+        self.last_odom_pose_time = None
+    
+    def apply_velocity(self, lin_vel_list, ang_vel_list, time_list, expected_list=None):
+        args = zip(lin_vel_list, ang_vel_list, time_list, expected_list)
+        
+        for lin_vel, ang_vel, time, expected_pos in args:
             initial_time = rospy.Time.now().to_sec()
             current_time = initial_time
             
@@ -91,6 +100,10 @@ class DeadReckoningNav:
             speed.linear.x = 0
             speed.angular.z = 0
             self.cmd_vel_mux_pub.publish(speed)
+            
+            if expected_pos:
+                rospy.sleep(0.5)
+                self.wait_and_publish_position(expected_pos)
         
     
     def move_robot_to_destiny(self, goal_pose_list):
@@ -113,14 +126,22 @@ class DeadReckoningNav:
             
             w_time = abs(angle_diff / self.max_w)
             
-            sign = 1 if angle_diff >= 0 else -1 
+            sign = 1 if angle_diff >= 0 else -1
             
-            velocities.append((0, sign * self.max_w, w_time))
+            
+            after_rotate = copy(current_pose)
+            after_rotate.theta += angle_diff
+            
+            velocities.append((0, sign * self.max_w, w_time, after_rotate))
             
             distance = current_pose.linear_distance_to(next_pose)
             d_time = distance / self.max_v
             
-            velocities.append((self.max_v, 0, d_time))
+            
+            after_advance = copy(next_pose)
+            after_advance.theta = after_rotate.theta
+            
+            velocities.append((self.max_v, 0, d_time, after_advance))
             
             
             current_theta = current_pose.theta + angle_diff
@@ -129,7 +150,7 @@ class DeadReckoningNav:
             angle_diff = final_fake.angular_distance_to(new_fake)
             w_time = abs(angle_diff / self.max_w) 
             sign = 1 if angle_diff >= 0 else -1
-            velocities.append((0, sign * self.max_w, w_time))
+            velocities.append((0, sign * self.max_w, w_time, next_pose))
                     
             current_pose = next_pose
             next_pose = next(pose_iter)
@@ -146,8 +167,11 @@ class DeadReckoningNav:
                                             orientation.z,
                                             orientation.w))
         
+        self.last_odom_pose = self.initial_pose + RobotPose(x, y, yaw)
+        self.last_odom_pose_time = time()
+        
         # self.current_pose = self.initial_pose + RobotPose(x, y, yaw)
-        #rospy.loginfo(f'Current pose - lin: ({x}, {y}) ang: ({yaw})')
+        # rospy.loginfo(f'Current pose - lin: ({x}, {y}) ang: ({yaw})')
     
     def real_pose_cb(self, odom):
         x = odom.position.x
@@ -157,17 +181,18 @@ class DeadReckoningNav:
                                                     odom.orientation.y,
                                                     odom.orientation.z,
                                                     odom.orientation.w ) )
-        #rospy.loginfo(f'Real pose - lin: ({x}, {y}, {z}) ang: ({roll}, {pitch}, {yaw})')
+        
+        self.last_real_pose = RobotPose(x, y, yaw)
+        self.last_real_pose_time = time()
+        # rospy.loginfo(f'Real pose - lin: ({x}, {y}, {z}) ang: ({roll}, {pitch}, {yaw})')
         
         
     def goal_pose_cb(self, pose_array):
-        
         def transform(pose):
             x = pose.position.x
             y = pose.position.y
             w = pose.orientation.w
             return (x, y, w)
-            
             
         pose_list = [ transform(pose) for pose in pose_array.poses ]
         
@@ -177,11 +202,45 @@ class DeadReckoningNav:
         
     def listen_and_spin(self):
         self.pose_sub = rospy.Subscriber('/goal_list', PoseArray, self.goal_pose_cb)
+        rospy.spin()
+        
+    def wait_and_publish_position(self, expected):
+        while True:
+            
+            if not self.last_odom_pose_time: 
+                self.rate.sleep()
+                continue
+                    
+            time_diff = abs(self.last_odom_pose_time - self.last_real_pose_time)
+            if time_diff > 0.01: # They are too far away
+                self.rate.sleep()
+                continue
+            
+            real_pose = Pose()
+            real_pose.position.x = self.last_real_pose.x
+            real_pose.position.y = self.last_real_pose.y
+            real_pose.orientation.w = self.last_real_pose.theta
+            
+            odom_pose = Pose()
+            odom_pose.position.x = self.last_odom_pose.x
+            odom_pose.position.y = self.last_odom_pose.y
+            odom_pose.orientation.w = self.last_odom_pose.theta
+            
+            expected_pose = Pose()
+            expected_pose.position.x = expected.x
+            expected_pose.position.y = expected.y
+            expected_pose.orientation.w = expected.theta
+            
+            poses = [real_pose, odom_pose,  expected_pose]
+            
+            self.position_diff_pub.publish(PoseArray(poses=poses))
+            return
         
 
 if __name__ == '__main__':
     nav = DeadReckoningNav()
     # Prevent missing log messages by waiting a small amount
     rospy.sleep(0.3)
+    # nav.wait_and_publish_position()
     nav.listen_and_spin()
-    rospy.spin()   
+    rospy.spin()

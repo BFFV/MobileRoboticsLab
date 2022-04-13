@@ -6,6 +6,6 @@
 
     <!--Nodes-->
     <node pkg="navigation" name="dead_reckoning_nav" type="dead_reckoning_nav.py"/>
-
     <node pkg="navigation" name="pose_file_reader" type="pose_file_reader.py"/>
+    <node pkg="navigation" name="position_diff_writer" type="position_diff_writer.py"/>
 </launch>

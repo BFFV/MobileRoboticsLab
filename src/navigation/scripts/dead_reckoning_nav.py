@@ -66,7 +66,7 @@ class DeadReckoningNav:
     def __init__(self):
         rospy.init_node('movement', anonymous=True)
         self.max_v = 0.2 # [m/s]
-        self.max_w = 1 * self.ROTATION_CORRECTION_FACTOR # [rad/s]
+        self.max_w = 1 # [rad/s]
         self.cmd_vel_mux_pub = rospy.Publisher('/yocs_cmd_vel_mux/input/navigation', 
                                                Twist, queue_size = 10)
         self.position_diff_pub = rospy.Publisher('/position_diff', 
@@ -92,6 +92,8 @@ class DeadReckoningNav:
         for lin_vel, ang_vel, time in args:
             initial_time = rospy.Time.now().to_sec()
             current_time = initial_time
+            
+            ang_vel *= self.ROTATION_CORRECTION_FACTOR
             
             # Loop in short steps to prevent velocity limit
             while current_time < initial_time + time:

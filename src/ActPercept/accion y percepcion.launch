@@ -3,11 +3,11 @@
     <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/>
     <include file="$(find very_simple_robot_simulator)/launch/openni_simulator_py.launch"/>
     <include file="$(find very_simple_robot_simulator)/launch/world_state.launch"/>
+    <include file="$(find sound_play)/soundplay_node.launch"/>
 
     <!--Nodes-->
-    <node pkg="navigation" name="dead_reckoning_nav" type="dead_reckoning_nav.py"/>
+    <node pkg="ActPercept" name="dead_reckoning_nav" type="dead_reckoning_nav.py" output="screen"/>
     <node pkg="navigation" name="pose_file_reader" type="pose_file_reader.py"/>
+    <node pkg="vision" name="obstacle_detector" type="obstacle_detector.py"/>
 
-    <!-- Just to debug we use the position writer -->
-    <!-- <node pkg="navigation" name="position_diff_writer" type="position_diff_writer.py"/> -->
 </launch>

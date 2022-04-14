@@ -24,6 +24,8 @@ def vector_angle(x0, y0, x1, y1):
 
 
 class RobotPose:
+    """Represents a pose and provides operations between them"""
+    
     def __init__(self, x, y, theta):
         self.x = x
         self.y = y
@@ -58,19 +60,22 @@ class RobotPose:
 class DeadReckoningNav:
     
     RATE_HZ = 60
+    ROTATION_CORRECTION_FACTOR = 1.09845578 # Found Experimentally
+    
     
     def __init__(self):
         rospy.init_node('movement', anonymous=True)
         self.max_v = 0.2 # [m/s]
-        self.max_w = 1 # [rad/s]
-        self.cmd_vel_mux_pub = rospy.Publisher('/yocs_cmd_vel_mux/input/navigation', Twist, queue_size = 10)
-        self.position_diff_pub = rospy.Publisher('/position_diff', PoseArray, queue_size=10)
+        self.max_w = 1 * self.ROTATION_CORRECTION_FACTOR # [rad/s]
+        self.cmd_vel_mux_pub = rospy.Publisher('/yocs_cmd_vel_mux/input/navigation', 
+                                               Twist, queue_size = 10)
+        self.position_diff_pub = rospy.Publisher('/position_diff', 
+                                                 PoseArray, queue_size=10)
         self.odom_sub = rospy.Subscriber( '/odom', Odometry, self.odometry_cb )
         self.real_pose_sub = rospy.Subscriber('/real_pose', Pose, self.real_pose_cb)
         self.rate = rospy.Rate(self.RATE_HZ)
         self.pose_sub = None
         self.initial_pose = RobotPose(1, 1, 0)
-        self.current_pose = self.initial_pose
         
         # Attrs for correctly reporting the current position
         self.last_real_pose = None
@@ -78,16 +83,15 @@ class DeadReckoningNav:
         self.last_odom_pose = None
         self.last_odom_pose_time = None
     
-    def apply_velocity(self, lin_vel_list, ang_vel_list, time_list, expected_list=None):
-        args = zip(lin_vel_list, ang_vel_list, time_list, expected_list)
+    def apply_velocity(self, lin_vel_list, ang_vel_list, time_list):
+        """Applies velocities secuentally. Note that arguments are split 
+           in different lists"""
         
-        for lin_vel, ang_vel, time, expected_pos in args:
+        args = zip(lin_vel_list, ang_vel_list, time_list)
+        
+        for lin_vel, ang_vel, time in args:
             initial_time = rospy.Time.now().to_sec()
             current_time = initial_time
-            
-            if ang_vel != 0:
-                ang_vel = ang_vel * 1.09845578
-            
             
             # Loop in short steps to prevent velocity limit
             while current_time < initial_time + time:
@@ -104,60 +108,51 @@ class DeadReckoningNav:
             speed.linear.x = 0
             speed.angular.z = 0
             self.cmd_vel_mux_pub.publish(speed)
+    
+    def apply_velocity_tuples(self, *vel_tuples):
+        """ Frontend for apply_velocities so we can pass just tuples of
+            velocities components"""
+        self.apply_velocity(*zip(*vel_tuples))
             
-            
-            # if ang_vel != 0:
-            #     self.wait_and_publish_position(expected_pos)
-                
-            # if expected_pos:
-            #     rospy.sleep(0.5)
-        
     
     def move_robot_to_destiny(self, goal_pose_list):
-        poses = [ RobotPose(*pose) for pose in goal_pose_list ] + [None]
-        rospy.loginfo(f"Current pos list {poses}")
+        """Moves robot to all poses in the list secuentally"""
         
-        pose_iter = iter(poses)
+        # TODO: Refactor
+        
+        poses = [ RobotPose(*pose) for pose in goal_pose_list ] + [None]
+        
         current_pose = self.initial_pose
+        pose_iter = iter(poses)
         next_pose = next(pose_iter)  
         
         velocities = []
         
         while next_pose:
-            # Align rotation 
             rospy.loginfo(f"Moving from {current_pose} to {next_pose}")
             
+            # We rotate until we are pointing to the next pose
             diff_pose = next_pose - current_pose
             fake_pos = RobotPose(cos(current_pose.theta), sin(current_pose.theta), 0)
             angle_diff = fake_pos.angular_distance_to(diff_pose)
-            
             w_time = abs(angle_diff / self.max_w)
+            sign = 1 if angle_diff >= 0 else -1    
+            velocities.append((0, sign * self.max_w, w_time))
             
-            sign = 1 if angle_diff >= 0 else -1
             
-            
-            after_rotate = copy(current_pose)
-            after_rotate.theta += angle_diff
-            
-            velocities.append((0, sign * self.max_w, w_time, after_rotate))
-            
+            # We go forward
             distance = current_pose.linear_distance_to(next_pose)
             d_time = distance / self.max_v
+            velocities.append((self.max_v, 0, d_time))
             
-            
-            after_advance = copy(next_pose)
-            after_advance.theta = after_rotate.theta
-            
-            velocities.append((self.max_v, 0, d_time, after_advance))
-            
-            
+            # We set the target orientation
             current_theta = current_pose.theta + angle_diff
             final_fake = RobotPose(cos(current_theta), sin(current_theta), 0)
             new_fake = RobotPose(cos(next_pose.theta), sin(next_pose.theta), 0)
             angle_diff = final_fake.angular_distance_to(new_fake)
             w_time = abs(angle_diff / self.max_w) 
             sign = 1 if angle_diff >= 0 else -1
-            velocities.append((0, sign * self.max_w, w_time, next_pose))
+            velocities.append((0, sign * self.max_w, w_time))
                     
             current_pose = next_pose
             next_pose = next(pose_iter)
@@ -177,9 +172,6 @@ class DeadReckoningNav:
         self.last_odom_pose = self.initial_pose + RobotPose(x, y, yaw)
         self.last_odom_pose_time = time()
         
-        # self.current_pose = self.initial_pose + RobotPose(x, y, yaw)
-        rospy.loginfo(f'Current pose - lin: ({x}, {y}) ang: ({yaw})')
-    
     def real_pose_cb(self, odom):
         x = odom.position.x
         y = odom.position.y
@@ -191,7 +183,6 @@ class DeadReckoningNav:
         
         self.last_real_pose = RobotPose(x, y, yaw)
         self.last_real_pose_time = time()
-        # rospy.loginfo(f'Real pose - lin: ({x}, {y}, {z}) ang: ({roll}, {pitch}, {yaw})')
         
         
     def goal_pose_cb(self, pose_array):
@@ -206,12 +197,14 @@ class DeadReckoningNav:
         self.move_robot_to_destiny(pose_list)
         
         
-        
     def listen_and_spin(self):
         self.pose_sub = rospy.Subscriber('/goal_list', PoseArray, self.goal_pose_cb)
         rospy.spin()
         
-    def wait_and_publish_position(self, expected):
+    def wait_and_publish_position(self):
+        """ For debugging purpouses. Waits for an odometry and real pose at same
+            time and sends it to position diff writer"""
+            
         while True:
             
             if not self.last_odom_pose_time: 
@@ -233,12 +226,7 @@ class DeadReckoningNav:
             odom_pose.position.y = self.last_odom_pose.y
             odom_pose.orientation.w = self.last_odom_pose.theta
             
-            expected_pose = Pose()
-            expected_pose.position.x = expected.x
-            expected_pose.position.y = expected.y
-            expected_pose.orientation.w = expected.theta
-            
-            poses = [real_pose, odom_pose,  expected_pose]
+            poses = [real_pose, odom_pose]
             
             self.position_diff_pub.publish(PoseArray(poses=poses))
             return
@@ -248,12 +236,4 @@ if __name__ == '__main__':
     nav = DeadReckoningNav()
     # Prevent missing log messages by waiting a small amount
     rospy.sleep(0.3)
-    
-    # for _ in range(12):
-    #     nav.apply_velocity([0], [nav.max_w], [pi / 2 / nav.max_w], [RobotPose(0,0, pi/2)])
-    #     rospy.sleep(1)
-    #     nav.wait_and_publish_position(RobotPose(0,0, pi/2))
-    #     nav.apply_velocity([nav.max_v], [0], [0.5], [RobotPose(0,0, pi/2)])
-    #     rospy.sleep(0.5)
     nav.listen_and_spin()
-    rospy.spin()

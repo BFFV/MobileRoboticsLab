@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>ActPercept</name>
+  <name>act_percept</name>
   <version>0.0.0</version>
-  <description>The ActPercept package</description>
+  <description>The act_percept package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/ActPercept</url> -->
+  <!-- <url type="website">http://wiki.ros.org/act_percept</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->

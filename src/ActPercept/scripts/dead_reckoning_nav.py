@@ -77,6 +77,7 @@ class DeadReckoningNav:
         self.obstacle_sub = rospy.Subscriber('/occupancy_state', String, self.obstacle_cb)                                           
         self.odom_sub = rospy.Subscriber( '/odom', Odometry, self.odometry_cb )
         self.real_pose_sub = rospy.Subscriber('/real_pose', Pose, self.real_pose_cb)
+        self.sound_handler = SoundClient()
         self.rate = rospy.Rate(self.RATE_HZ)
         self.pose_sub = None
         self.initial_pose = RobotPose(1, 1, 0)
@@ -106,6 +107,12 @@ class DeadReckoningNav:
             total_sleep_time = 0
             # Loop in short steps to prevent velocity limit
             while current_time - total_sleep_time < initial_time + time:
+                # If it sees an obstacle the robot will speak
+                if self.obstacle != "free":
+                    rospy.loginfo(self.obstacle)
+                    # Descomentar esto para que hable, en WSL no me funciona
+                    # self.sound_handler.say(self.obstacle, voice = 'voice_kal_diphone', volume = 1.0)
+
                 while self.obstacle != "free":
                     rospy.sleep(sleep_time)
                     total_sleep_time += sleep_time 

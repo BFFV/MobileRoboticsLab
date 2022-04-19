@@ -105,7 +105,7 @@ class DeadReckoningNav:
                 speed.linear.x = lin_vel
                 speed.angular.z = ang_vel
                 self.cmd_vel_mux_pub.publish(speed)
-                self.rate.sleep() # This adds time
+                self.rate.sleep()
 
                 # If it sees an obstacle the robot will speak
                 if self.obstacle != 'free':
@@ -114,13 +114,15 @@ class DeadReckoningNav:
                     speed.linear.x = 0
                     speed.angular.z = 0
                     self.cmd_vel_mux_pub.publish(speed)
-                    rospy.loginfo(self.obstacle)
-                    # self.sound_handler.say(self.obstacle.replace('_', ' '), voice='voice_kal_diphone', volume=1.0)
-                    rospy.loginfo("\nasd")
-                    rospy.loginfo(time)
-                    rospy.loginfo(timer)
+                    
+                    # Reset the time to a new start
                     time -= rospy.Time.now().to_sec() - initial_time
-                    rospy.loginfo(time)
+
+                    # Makes the robot talk
+                    rospy.loginfo(self.obstacle)
+                    self.sound_handler.say(self.obstacle.replace('_', ' '), voice='voice_kal_diphone', volume=1.0)
+
+                # It makes the robot stop until there is no obstacule
                 while self.obstacle != 'free':
                     self.rate.sleep()
                     initial_time = rospy.Time.now().to_sec()

@@ -90,30 +90,43 @@ class DeadReckoningNav:
            into different lists"""
 
         args = zip(lin_vel_list, ang_vel_list, time_list)
-        sleep_time = 0.001
+
         for lin_vel, ang_vel, time in args:
             initial_time = rospy.Time.now().to_sec()
             current_time = initial_time
+            timer = 0
 
             # Correction factor to fix rotational error
             ang_vel *= self.ROTATION_CORRECTION_FACTOR
 
             # Loop in short steps to prevent velocity limit
-            total_sleep_time = 0
-            while current_time - total_sleep_time < initial_time + time:
-                # If it sees an obstacle the robot will speak
-                if self.obstacle != 'free':
-                    rospy.loginfo(self.obstacle)
-                    self.sound_handler.say(self.obstacle.replace('_', ' '), voice='voice_kal_diphone', volume=1.0)
-                while self.obstacle != 'free':
-                    rospy.sleep(sleep_time)
-                    total_sleep_time += sleep_time
+            while timer < time:
                 speed = Twist()
                 speed.linear.x = lin_vel
                 speed.angular.z = ang_vel
                 self.cmd_vel_mux_pub.publish(speed)
                 self.rate.sleep() # This adds time
+
+                # If it sees an obstacle the robot will speak
+                if self.obstacle != 'free':
+                    # Stop the current movement
+                    speed = Twist()
+                    speed.linear.x = 0
+                    speed.angular.z = 0
+                    self.cmd_vel_mux_pub.publish(speed)
+                    rospy.loginfo(self.obstacle)
+                    # self.sound_handler.say(self.obstacle.replace('_', ' '), voice='voice_kal_diphone', volume=1.0)
+                    rospy.loginfo("\nasd")
+                    rospy.loginfo(time)
+                    rospy.loginfo(timer)
+                    time -= rospy.Time.now().to_sec() - initial_time
+                    rospy.loginfo(time)
+                while self.obstacle != 'free':
+                    self.rate.sleep()
+                    initial_time = rospy.Time.now().to_sec()
+
                 current_time = rospy.Time.now().to_sec()
+                timer = current_time - initial_time
 
             # Stop the current movement
             speed = Twist()

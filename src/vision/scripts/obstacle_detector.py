@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import cv2
 import numpy as np
 import rospy
 from cv_bridge import CvBridge
@@ -30,14 +29,17 @@ class TurtlebotKinect:
             self.detect_obstacles()
             rate.sleep()
 
-    # Check if objects in matrix partition are closer than 0.5 [m]
+    # Check if objects in matrix partition are closer than 0.6 [m]
     @staticmethod
     def check_distance(matrix):
-        fixed_matrix = cv2.patchNaNs(matrix, 100)  # Replace NaN with big distance
-        depth_array = fixed_matrix.flatten()
+        # If at least 80% of the pixels are NaN, assume an obstacle
+        size = matrix.shape[0] * matrix.shape[1]
+        if np.count_nonzero(np.isnan(matrix)) >= size * 0.8:
+            return True
 
-        # If any of the pixels have distance < 0.5 or NaN then there is an obstacle
-        return np.any(depth_array < 0.5) or np.any(depth_array >= 100)
+        # If any of the pixels have distance < 0.6 then there is an obstacle
+        fixed_matrix = np.nan_to_num(matrix, nan=1000)  # Replace NaN with a large invalid distance
+        return np.any(fixed_matrix < 0.6)
 
     # Detect obstacles in estimated depth image
     def detect_obstacles(self):

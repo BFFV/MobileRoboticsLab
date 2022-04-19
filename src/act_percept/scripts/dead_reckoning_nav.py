@@ -114,7 +114,7 @@ class DeadReckoningNav:
                     speed.linear.x = 0
                     speed.angular.z = 0
                     self.cmd_vel_mux_pub.publish(speed)
-                    
+
                     # Reset the time to a new start
                     time -= rospy.Time.now().to_sec() - initial_time
 
@@ -122,11 +122,10 @@ class DeadReckoningNav:
                     rospy.loginfo(self.obstacle)
                     self.sound_handler.say(self.obstacle.replace('_', ' '), voice='voice_kal_diphone', volume=1.0)
 
-                # It makes the robot stop until there is no obstacule
+                # It makes the robot stop until there is no obstacle
                 while self.obstacle != 'free':
                     self.rate.sleep()
                     initial_time = rospy.Time.now().to_sec()
-
                 current_time = rospy.Time.now().to_sec()
                 timer = current_time - initial_time
 

@@ -5,9 +5,9 @@
     <include file="$(find very_simple_robot_simulator)/launch/world_state.launch"/>
 
     <!--Nodes-->
-    <node pkg="navigation" name="dead_reckoning_nav" type="dead_reckoning_nav.py"/>
-    <node pkg="navigation" name="pose_file_reader" type="pose_file_reader.py"/>
+    <node pkg="movement" name="dead_reckoning_nav" type="dead_reckoning_nav.py"/>
+    <node pkg="movement" name="pose_file_reader" type="pose_file_reader.py"/>
 
     <!-- Just to debug we use the position writer -->
-    <!-- <node pkg="navigation" name="position_diff_writer" type="position_diff_writer.py"/> -->
+    <!-- <node pkg="movement" name="position_diff_writer" type="position_diff_writer.py"/> -->
 </launch>

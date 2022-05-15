@@ -9,12 +9,20 @@
 
   <node name="ang_ctrl" pkg="pid" type="controller" ns="robot_ang">
     <param name="Kp" value="0.5" />
-    <param name="Ki" value="0.0" />
+    <param name="Ki" value="0.02" />
     <param name="Kd" value="0.0" />
-    <param name="upper_limit" value="0.2" />
-    <param name="lower_limit" value="-0.2" />
+    <param name="upper_limit" value="0.7" />
+    <param name="lower_limit" value="-0.7" />
     <param name="angle_error" value="true" />
     <param name="angle_wrap" value="2.0*3.14159"/>
+  </node>
+
+  <node name="dist_ctrl" pkg="pid" type="controller" ns="robot_dist">
+    <param name="Kp" value="0.5" />
+    <param name="Ki" value="0.0" />
+    <param name="Kd" value="0.0" />
+    <param name="upper_limit" value="0.3" />
+    <param name="lower_limit" value="-0.3" />
   </node>
 
   <node pkg="ang_controller" name="ang_controller" type="ang_controller.py" output="screen"/>

@@ -2,7 +2,8 @@
 
 import numpy as np
 import rospy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Pose, Twist
+from math import atan2, sqrt
 from nav_msgs.msg import Odometry, Path
 from pid_controller import PIDController
 from tf.transformations import euler_from_quaternion
@@ -17,16 +18,18 @@ class FollowTheCarrot:
 
     # Initialize variables
     def variables_init(self):
-        # TODO: actual Positions
-        self.position = 0
-        self.target = 0
-        self.path = []
-        # TODO: adjust
-        self.look_ahead = 0.4
+        # Position
+        self.position = None
+        self.target = None
 
         # Orientation
         self.angle = 0.0
         self.goal_angle = 0.0
+
+        # Path
+        self.path = []
+        # TODO: adjust
+        self.look_ahead = 0.2
 
         # Message frequency: 10Hz
         self.hz = 10
@@ -55,19 +58,28 @@ class FollowTheCarrot:
 
     # Obtain pathline to follow and start tracking
     def start_tracking(self, pathline):
-        self.path = pathline.poses
-        self.goal_angle = self.calculate_angle_diff(self.path[10])
+        self.path = [p.pose.position for p in pathline.poses]
+        self.move_target()
+        self.goal_angle = self.calculate_angle_diff()
         self.run()
 
-    # Calculate angle difference between the robot and target
-    def calculate_angle_diff(self, target):
-        #TODO:
-        return np.pi / 2
+    # Calculate distance between two points
+    @staticmethod
+    def distance(a, b):
+        return sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
+
+    # TODO: Calculate angle difference between the robot and target
+    def calculate_angle_diff(self):
+        return atan2(self.target.y - self.position.y, self.target.x - self.position.x)
 
     # Update orientation dynamically
     def orientation(self, odom_data):
-        # Get odometry orientation info
+        # Get odometry info
         pose_data = odom_data.pose.pose
+        pos = Pose()
+        pos.position.x = pose_data.position.x + 1
+        pos.position.y = pose_data.position.y + 1
+        self.position = pos.position
         quaternion = (pose_data.orientation.x,
                       pose_data.orientation.y,
                       pose_data.orientation.z,
@@ -75,32 +87,41 @@ class FollowTheCarrot:
         _, _, yaw = euler_from_quaternion(quaternion)
         self.angle = yaw
 
+        # TODO: Map angles to [0, 2pi)
+        if self.angle < 0:
+            self.angle = 2 * np.pi + self.angle
+
         # Update controller with current state
         self.angle_controller.pub_state(self.angle)
 
         # Update controller with current goal
-        # TODO: Calculate angle to target
-        self.angle_controller.pub_set_point(self.goal_angle)
+        if self.target:
+            self.goal_angle = self.calculate_angle_diff()
+            self.angle_controller.pub_set_point(self.goal_angle)
 
     # Move the target along the pathline
     def move_target(self):
-        # TODO: Calculate shortest point, then sum distances until look-ahead
+        # Calculate closest point to the robot
         min_distance = float('inf')
         closest_point_idx = 0
         for idx, point in enumerate(self.path):
-            # if distance < min_distance:
-            # min_distance = distance
-            # closest_point_idx = idx
-            pass
+            distance = self.distance(self.position, point)
+            if distance < min_distance:
+                min_distance = distance
+                closest_point_idx = idx
+
+        # Find target
         last_point = self.path[closest_point_idx]
+        total_distance = 0
         for point in self.path[closest_point_idx:]:
-            #total_distance += distance(point, last_point)
-            #if total_distance >= self.look_ahead:
-                # self.target = point
-                # return
-            #last_point = point
-            pass
-        #self.target = point
+            total_distance += self.distance(last_point, point)
+            if total_distance >= self.look_ahead:
+                self.target = point
+                print(f'Target: ({self.target.x}, {self.target.y})')
+                return
+            last_point = point
+        self.target = point
+        print(f'Target: ({self.target.x}, {self.target.y})')
 
     # Pathline tracking with low level control
     def run(self):
@@ -111,9 +132,8 @@ class FollowTheCarrot:
             # Actuation
             self.cmd_vel_mux_pub.publish(self.speed_msg)
 
-            # TODO: Move the target
-            # TODO: Calculate shortest point, then sum distances until look-ahead
-            #self.move_target()
+            # Move the target
+            self.move_target()
 
             # Sleep
             self.rate_obj.sleep()

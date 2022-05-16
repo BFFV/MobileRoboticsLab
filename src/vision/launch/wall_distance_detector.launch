@@ -1,0 +1,9 @@
+<launch>
+    <!--Simulator-->
+    <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/openni_simulator_py.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/world_state.launch"/>
+
+    <!--Nodes-->
+    <node pkg="vision" name="wall_distance_detector" type="wall_distance_detector.py" output="screen"/>
+</launch>

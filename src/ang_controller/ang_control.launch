@@ -8,8 +8,8 @@
   <!--Nodes-->
 
   <node name="ang_ctrl" pkg="pid" type="controller" ns="robot_ang">
-    <param name="Kp" value="0.5" />
-    <param name="Ki" value="0.02" />
+    <param name="Kp" value="0.35" />
+    <param name="Ki" value="0.001" />
     <param name="Kd" value="0.0" />
     <param name="upper_limit" value="0.7" />
     <param name="lower_limit" value="-0.7" />

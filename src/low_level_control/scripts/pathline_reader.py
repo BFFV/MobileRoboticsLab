@@ -2,36 +2,37 @@
 
 import os
 import rospy
-from geometry_msgs.msg import PoseArray, Pose
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Path
 
 
-# Reads poses from a file
-class PoseFileReader:
-    """Reads poses from a file. A pose is a line with float values separated by spaces"""
+# Reads pathlines from a file
+class PathlineReader:
+    """Reads pathlines from a file. A pathline is a list of (x,y) coordinates."""
     def __init__(self):
-        rospy.init_node('pose_file_reader', anonymous=True)
-        self.pose_pub = rospy.Publisher('/goal_list', PoseArray, queue_size=10)
+        rospy.init_node('pathline_reader')
+        self.path_pub = rospy.Publisher('/nav_plan', Path, queue_size=1)
 
+    # Read pathline from file
     def read_and_publish(self, filename):
         dirname = os.path.dirname(__file__)
         abs_file = os.path.join(dirname, filename)
-        poses = []
+        points = []
         with open(abs_file, encoding='utf-8') as file:
             for line in file:
                 line = line.strip()
                 if not line or line[0] == '#':
                     continue # Skip empty lines and comments
-                x, y, w = [float(num) for num in line.split()]
-                pose = Pose()
-                pose.position.x = x
-                pose.position.y = y
-                pose.orientation.w = w
-                poses.append(pose)
-        self.pose_pub.publish(PoseArray(poses=poses))
-        rospy.loginfo('Successfully published %d goal poses', len(poses))
+                x, y = [float(num) for num in line.split(',')]
+                point = PoseStamped()
+                point.pose.position.x = x
+                point.pose.position.y = y
+                points.append(point)
+        self.path_pub.publish(Path(poses=points))
+        rospy.loginfo('Successfully published %d points for a pathline!', len(points))
 
-# Pose reading from files
+# Pathline reading from files
 if __name__ == '__main__':
-    reader = PoseFileReader()
-    rospy.sleep(0.5)
-    reader.read_and_publish('../input_files/trajectory/path_line.txt')
+    reader = PathlineReader()
+    rospy.sleep(2)
+    reader.read_and_publish('../input_files/paths/path_line.txt')

@@ -34,4 +34,4 @@ class PoseFileReader:
 if __name__ == '__main__':
     reader = PoseFileReader()
     rospy.sleep(0.5)
-    reader.read_and_publish('../input_files/trajectory/square.txt')
+    reader.read_and_publish('../input_files/paths/square.txt')

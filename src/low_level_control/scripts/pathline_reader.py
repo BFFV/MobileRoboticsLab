@@ -35,4 +35,4 @@ class PathlineReader:
 if __name__ == '__main__':
     reader = PathlineReader()
     rospy.sleep(2)
-    reader.read_and_publish('../input_files/paths/path_line.txt')
+    reader.read_and_publish('../input_files/paths/path_sin.txt')

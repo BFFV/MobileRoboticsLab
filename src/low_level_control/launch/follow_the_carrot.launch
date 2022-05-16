@@ -6,9 +6,9 @@
 
     <!--PID Controller-->
     <node name="angle_controller" pkg="pid" type="controller" ns="pathline_follower">
-        <param name="Kp" value="0.5" />
-        <param name="Ki" value="0.0" />
-        <param name="Kd" value="0.0" />
+        <param name="Kp" value="1.0" />
+        <param name="Ki" value="1.0" />
+        <param name="Kd" value="0.5" />
         <param name="upper_limit" value="0.2" />
         <param name="lower_limit" value="-0.2" />
         <param name="angle_error" value="true"/>  <!--keep the error between -pi and pi-->

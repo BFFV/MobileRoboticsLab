@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-import numpy as np
 import rospy
-from geometry_msgs.msg import Pose, Twist
+from geometry_msgs.msg import Pose, PoseArray, Twist
 from math import atan2, sqrt
 from nav_msgs.msg import Odometry, Path
 from pid_controller import PIDController
@@ -28,8 +27,8 @@ class FollowTheCarrot:
 
         # Path
         self.path = []
-        # TODO: adjust
-        self.look_ahead = 0.2
+        self.real_path = []
+        self.look_ahead = 0.3
 
         # Message frequency: 10Hz
         self.hz = 10
@@ -56,8 +55,12 @@ class FollowTheCarrot:
         # Pathline to follow
         rospy.Subscriber('/nav_plan', Path, self.start_tracking)
 
+        # Plot real trajectory
+        self.trajectory = rospy.Publisher('/trajectory', PoseArray, queue_size=1)
+
     # Obtain pathline to follow and start tracking
     def start_tracking(self, pathline):
+        self.trajectory.publish(PoseArray(poses=[p.pose for p in pathline.poses]))
         self.path = [p.pose.position for p in pathline.poses]
         self.move_target()
         self.goal_angle = self.calculate_angle_diff()
@@ -68,9 +71,21 @@ class FollowTheCarrot:
     def distance(a, b):
         return sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 
-    # TODO: Calculate angle difference between the robot and target
+    # Calculate angle difference between the robot and target
     def calculate_angle_diff(self):
         return atan2(self.target.y - self.position.y, self.target.x - self.position.x)
+
+    # Calculate Mean Squared Error for the trajectory
+    def obtain_error(self):
+        squared_error = 0
+        for p in self.real_path:
+            min_distance = float('inf')
+            for point in self.path:
+                distance = self.distance(p, point)
+                if distance < min_distance:
+                    min_distance = distance
+            squared_error += min_distance ** 2
+        print(f'MSE: {squared_error / len(self.real_path)}')
 
     # Update orientation dynamically
     def orientation(self, odom_data):
@@ -87,9 +102,8 @@ class FollowTheCarrot:
         _, _, yaw = euler_from_quaternion(quaternion)
         self.angle = yaw
 
-        # TODO: Map angles to [0, 2pi)
-        if self.angle < 0:
-            self.angle = 2 * np.pi + self.angle
+        # Save info
+        self.real_path.append(pos.position)
 
         # Update controller with current state
         self.angle_controller.pub_state(self.angle)
@@ -117,15 +131,14 @@ class FollowTheCarrot:
             total_distance += self.distance(last_point, point)
             if total_distance >= self.look_ahead:
                 self.target = point
-                print(f'Target: ({self.target.x}, {self.target.y})')
                 return
             last_point = point
         self.target = point
-        print(f'Target: ({self.target.x}, {self.target.y})')
 
     # Pathline tracking with low level control
     def run(self):
-        while True:
+        # Stop when the goal is reached
+        while self.distance(self.position, self.target) > 0.1:
             # Adjust orientation with controller
             self.speed_msg.angular.z = self.angle_controller.speed
 
@@ -137,6 +150,9 @@ class FollowTheCarrot:
 
             # Sleep
             self.rate_obj.sleep()
+
+        # Calculate Mean Squared Error
+        self.obtain_error()
 
 # Follow the Carrot pathline tracking
 if __name__ == '__main__':

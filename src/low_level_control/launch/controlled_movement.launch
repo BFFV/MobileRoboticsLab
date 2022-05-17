@@ -1,0 +1,34 @@
+<launch>
+    <!--Simulator-->
+    <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/openni_simulator_py.launch"/>
+    <include file="$(find very_simple_robot_simulator)/launch/world_state.launch"/>
+
+    <!--PID Controller-->
+    <node name="ang_ctrl" pkg="pid" type="controller" ns="robot_ang">
+        <param name="Kp" value="0.35"/>
+        <param name="Ki" value="0.001"/>
+        <param name="Kd" value="0.0"/>
+        <param name="upper_limit" value="0.7"/>
+        <param name="lower_limit" value="-0.7"/>
+        <param name="angle_error" value="true"/>
+        <param name="angle_wrap" value="2.0*3.14159"/>
+    </node>
+    <node name="dist_ctrl" pkg="pid" type="controller" ns="robot_dist">
+        <param name="Kp" value="0.5"/>
+        <param name="Ki" value="0.001"/>
+        <param name="Kd" value="0.0"/>
+        <param name="upper_limit" value="0.3"/>
+        <param name="lower_limit" value="-0.3"/>
+    </node>
+
+    <!--Nodes-->
+    <node pkg="low_level_control" name="controlled_movement" type="controlled_movement.py" output="screen"/>
+
+    <!--Plot-->
+    <node name="rqt_plot_ang" pkg="rqt_plot" type="rqt_plot"
+        args="/robot_ang/control_effort /robot_ang/state /robot_ang/setpoint"/>
+    <node name="rqt_plot_dist" pkg="rqt_plot" type="rqt_plot"
+        args="/robot_dist/control_effort /robot_dist/state /robot_dist/setpoint"/>
+    <node pkg="visualization" name="plot_trajectory" type="plot_trajectory.py"/>
+</launch>

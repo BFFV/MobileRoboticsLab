@@ -19,12 +19,20 @@
 
   <node name="dist_ctrl" pkg="pid" type="controller" ns="robot_dist">
     <param name="Kp" value="0.5" />
-    <param name="Ki" value="0.0" />
+    <param name="Ki" value="0.001" />
     <param name="Kd" value="0.0" />
     <param name="upper_limit" value="0.3" />
     <param name="lower_limit" value="-0.3" />
   </node>
 
   <node pkg="pid_movement" name="movement" type="movement.py" output="screen"/>
+
+    <!-- run grafic control_effort, state, setpoint-->
+  <node name="rqt_plot_ang" pkg="rqt_plot" type="rqt_plot" 
+    args="/robot_ang/control_effort /robot_ang/state /robot_ang/setpoint" />
+
+  <node name="rqt_plot_dist" pkg="rqt_plot" type="rqt_plot" 
+    args="/robot_dist/control_effort /robot_dist/state /robot_dist/setpoint" />
+  <!-- run for change kp, ki and kd-->
 
 </launch>

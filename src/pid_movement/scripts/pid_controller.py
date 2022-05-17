@@ -29,6 +29,5 @@ class PIDController(object):
   
   def actuation( self, data ):
     self.speed = float( data.data )
-    # rospy.loginfo( 'speed received: %f' % ( self.speed ))
 
 

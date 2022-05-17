@@ -8,10 +8,10 @@ from std_msgs.msg import Float64
 from tf.transformations import euler_from_quaternion
 from robotpose import RobotPose
 
-class AngController(object):
+class Movement(object):
 
   def __init__(self) -> None:
-    rospy.init_node('ang_controller')
+    rospy.init_node('movement')
     self.variables_init()
     self.connection_init()
 
@@ -159,7 +159,7 @@ class AngController(object):
 
 movement = [(1,0, 90), (1,1,180), (0,1,-90), (0,0,0)]
 
-controller = AngController()
+controller = Movement()
 controller.mover_robot_a_destino_ctrl(movement)
 rospy.spin()
 

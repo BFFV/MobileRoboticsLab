@@ -25,6 +25,6 @@
     <param name="lower_limit" value="-0.3" />
   </node>
 
-  <node pkg="ang_controller" name="ang_controller" type="ang_controller.py" output="screen"/>
+  <node pkg="pid_movement" name="movement" type="movement.py" output="screen"/>
 
 </launch>

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import numpy as np
 import rospy
@@ -10,7 +10,7 @@ from std_msgs.msg import Float32MultiArray
 # Detect distance to walls
 class WallDistanceDetector:
     RATE_HZ = 10
-    MAX_DEPTH = 1.5
+    MAX_DEPTH = 2.5
     CHANGE_TRESHOLD = 0.4
 
     def __init__(self):
@@ -25,8 +25,17 @@ class WallDistanceDetector:
         width, height = img.shape
         matrix = img.copy()
 
+        cut_left = 0.3
+        cut_right = 0.15 
+        
+        matrix = matrix / 1000
+        matrix = matrix[:,int(cut_left * 640): int((1 - cut_right) * 640)]
+
+        print(matrix.shape)
+        print(matrix[230:250, 310:330])
+
         # Return invalid in case of a wall too close to the robot
-        if np.count_nonzero(np.isnan(matrix)) >= width * height * 0.98:
+        if np.count_nonzero(matrix < 0.1) >= width * height * 0.9:
             self.publish_distance_msg([-1, -1])
             return
         matrix = self.preprocess(matrix)

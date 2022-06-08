@@ -1,21 +1,26 @@
 <launch>
     <!--Simulator-->
-    <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/>
-    <include file="$(find very_simple_robot_simulator)/launch/openni_simulator_py.launch"/>
+    <!-- <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/> -->
+    <!-- <include file="$(find very_simple_robot_simulator)/launch/openni_simulator_py.launch"/> -->
+
+    <include file="$(find kobuki_node)/launch/minimal.launch" />
+    <include file="$(find freenect_launch)/launch/freenect.launch" />
 
     <!--Nodes-->
     <node pkg="vision" name="wall_distance_detector" type="wall_distance_detector.py" output="screen"/>
+    <!--
     <node pkg="very_simple_robot_simulator" name="world_state_gui" type="world_state_gui.py" output="screen">
         <param name="map_file" type="yaml" value="$(find very_simple_robot_simulator)/maps/pasillo.yaml"/>
     </node>
+    -->
     <node pkg="low_level_control" name="corridor_navigation" type="corridor_navigation.py" output="screen"/>
-    <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/camera/depth/image_raw"/>
+    <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/camera/depth/image_raw"/> -->
 
     <!--PID Controller-->
     <node name="angle_controller" pkg="pid" type="controller" ns="wall_follower">
         <param name="Kp" value="1.4"/>
-        <param name="upper_limit" value="1.6"/>
-        <param name="lower_limit" value="-1.6"/>
+        <param name="upper_limit" value="1"/>
+        <param name="lower_limit" value="-1"/>
         <param name="angle_error" value="true"/>  <!--keep the error between -pi and pi-->
         <param name="angle_wrap" value="2.0*3.14159"/>  <!--360 degrees-->
     </node>

@@ -1,9 +1,13 @@
 <launch>
-    <!--Simulator-->
-    <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/>
+    <!--
+        <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/>
     <include file="$(find very_simple_robot_simulator)/launch/openni_simulator_py.launch"/>
     <include file="$(find very_simple_robot_simulator)/launch/world_state.launch"/>
+    -->
 
+    <include file="$(find kobuki_node)/launch/minimal.launch" />
+    <include file="$(find freenect_launch)/launch/freenect.launch" />
+    
     <!--PID Controller-->
     <node name="ang_ctrl" pkg="pid" type="controller" ns="robot_ang">
         <param name="Kp" value="0.35"/>

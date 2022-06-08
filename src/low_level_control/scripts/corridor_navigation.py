@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import rospy
 from geometry_msgs.msg import Twist
@@ -35,7 +35,7 @@ class CorridorNavigator:
         diff = distance_right - distance_left
         self.angle_controller.pub_state(diff)
 
-    def apply_velocity(self, linear=0.2, angular=0):
+    def apply_velocity(self, linear=0.15, angular=0):
         speed_msg = Twist()
         speed_msg.linear.x = linear if not self.stop else 0
         speed_msg.angular.z = angular if not self.stop else 0

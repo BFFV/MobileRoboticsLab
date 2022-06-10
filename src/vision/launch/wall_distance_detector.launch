@@ -1,12 +1,12 @@
 <launch>
     <!--Simulator-->
-    <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/>
+    <!-- <include file="$(find very_simple_robot_simulator)/launch/minimal_simulator_py.launch"/> -->
     
-    <include file="$(find very_simple_robot_simulator)/launch/openni_simulator_py.launch"/>
+    <!-- <include file="$(find very_simple_robot_simulator)/launch/openni_simulator_py.launch"/> -->
 
     <!--Nodes-->
     <node pkg="vision" name="wall_distance_detector" type="wall_distance_detector.py" output="screen"/>
-    <node pkg="very_simple_robot_simulator" name="world_state_gui" type="world_state_gui.py" output="screen">
-        <param name="map_file" type="yaml" value="$(find very_simple_robot_simulator)/maps/pasillo.yaml" />
-    </node>
+    <!-- <node pkg="very_simple_robot_simulator" name="world_state_gui" type="world_state_gui.py" output="screen"> -->
+        <!-- <param name="map_file" type="yaml" value="$(find very_simple_robot_simulator)/maps/pasillo.yaml" /> -->
+    <!-- </node> -->
 </launch>

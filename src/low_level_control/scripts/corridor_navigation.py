@@ -22,6 +22,7 @@ class CorridorNavigator:
     def run(self):
         self.angle_controller.pub_set_point(0)
         while not rospy.is_shutdown():
+            # print(self.angle_controller.speed)pri
             self.apply_velocity(angular=self.angle_controller.speed)
             self.rate.sleep()
 
@@ -35,7 +36,7 @@ class CorridorNavigator:
         diff = distance_right - distance_left
         self.angle_controller.pub_state(diff)
 
-    def apply_velocity(self, linear=0.15, angular=0):
+    def apply_velocity(self, linear=0.1, angular=0):
         speed_msg = Twist()
         speed_msg.linear.x = linear if not self.stop else 0
         speed_msg.angular.z = angular if not self.stop else 0

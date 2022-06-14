@@ -1,0 +1,10 @@
+<launch>
+    <!--Soundplay-->
+    <include file="$(find sound_play)/soundplay_node.launch"/>
+
+    <!--Nodes-->
+    <node pkg="probabilistic_model" name="particle_filter" type="particle_filter.py" output="screen"/>
+
+    <!--Plot-->
+    <node pkg="visualization" name="plot_state" type="plot_state.py"/>
+</launch>

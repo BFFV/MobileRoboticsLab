@@ -10,9 +10,9 @@ from std_msgs.msg import Float32MultiArray
 # Detect distance to walls
 class WallDistanceDetector:
     RATE_HZ = 10
-    MAX_DEPTH = 10
+    MAX_DEPTH = 2
     CHANGE_TRESHOLD = 0.4
-    MEAN_PATCH_SIZE = 30
+    MEAN_PATCH_SIZE = 60
 
     def __init__(self):
         rospy.init_node('wall_distance')
@@ -27,11 +27,11 @@ class WallDistanceDetector:
         width, height = img.shape
         matrix = img.copy()
         
-        cut_left = 0.2
+        cut_left = 0.15
         cut_right = 0.2
         
         matrix = matrix / 1000
-        matrix = matrix[:,int(cut_left * height): int((1 - cut_right) * height)]
+        matrix = matrix[:,int(cut_left * width): int((1 - cut_right) * width)]
         
         height, width = matrix.shape
 
@@ -61,14 +61,14 @@ class WallDistanceDetector:
         distance_right = distance_right_matrix.mean()
 
         # if change_coords:
-        vals = [max(0.3, distance_left), 1]
+        vals = [max(0.1, distance_left), 1]
         print(vals)
         self.publish_distance_msg(vals)
         return
 
-        slope = self.get_horizontal_slope(matrix)
-        vals = [distance_left, -1] if slope > 0 else [-1, distance_right] 
-        self.publish_distance_msg(vals)
+        # slope = self.get_horizontal_slope(matrix)
+        # vals = [distance_left, -1] if slope > 0 else [-1, distance_right] 
+        # self.publish_distance_msg(vals)
 
     @staticmethod
     def preprocess(matrix):

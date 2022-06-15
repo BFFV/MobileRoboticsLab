@@ -57,11 +57,11 @@ class WallDistanceDetector:
         
         # print(distance_left_matrix)
         
-        distance_left = distance_left_matrix.mean()
-        distance_right = distance_right_matrix.mean()
+        distance_left = min(2, distance_left_matrix.mean())
+        distance_right = min(2, distance_right_matrix.mean())
 
         # if change_coords:
-        vals = [max(0.1, distance_left), 1]
+        vals = [max(0.1, distance_left), max(0.1, distance_right)]
         print(vals)
         self.publish_distance_msg(vals)
         return

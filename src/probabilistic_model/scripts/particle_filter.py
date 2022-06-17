@@ -15,7 +15,7 @@ class ParticleFilter:
         self.variables_init()
         self.connections_init()
         rospy.sleep(3)
-        while not self.obstacles:
+        while not self.distance_tree:
             rospy.sleep(1)
         self.run()
         rospy.spin()
@@ -69,6 +69,11 @@ class ParticleFilter:
         # Read sensor data
         rospy.Subscriber('/scan', LaserScan, self.set_sensor_data, queue_size=1)
 
+    # TODO: BENJA: Detect if a pixel is an obstacle edge
+    @staticmethod
+    def is_obstacle_edge(pixel):
+        pass
+
     # Store obstacles from map
     def generate_map(self, map):
         self.map_info = map.info
@@ -83,6 +88,8 @@ class ParticleFilter:
             for w in range(map_img.shape[1]):
                 if map_img[h, w] == 0:
                     self.obstacles.append([w, h])
+        #print(self.obstacles)
+        # TODO: BENJA: use is_obstacle_edge method to improve this
         self.distance_tree = spatial.KDTree(self.obstacles)
 
     # Set sensor data
@@ -128,6 +135,9 @@ class ParticleFilter:
 
             # Calculate distance to closest obstacles (assuming laser points from state)
             distances, _ = self.distance_tree.query(laser_points)
+
+            # TODO: BENJA: improve gaussian with the obstacle edge change
+            # TODO: BENJA: test different states likelihood (and adjust params)
 
             # Get likelihood according to expected distribution of distances
             for dist in distances:

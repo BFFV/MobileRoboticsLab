@@ -36,10 +36,10 @@ class CorridorNavigator:
         diff = distance_right - distance_left
         self.angle_controller.pub_state(diff)
 
-    def apply_velocity(self, linear=0.1, angular=0):
+    def apply_velocity(self, linear=0.0, angular=0):
         speed_msg = Twist()
         speed_msg.linear.x = linear if not self.stop else 0
-        speed_msg.angular.z = angular if not self.stop else 0
+        speed_msg.angular.z = angular
         self.cmd_vel_mux_pub.publish(speed_msg)
 
 # Navigate corridor

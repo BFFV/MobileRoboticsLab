@@ -75,8 +75,9 @@ class ParticleFilter:
         rospy.Subscriber('/scan', LaserScan, self.set_sensor_data, queue_size=1)
 
     # TODO: BENJA: Detect if a pixel is an obstacle edge
-    def is_obstacle_edge(self, pixel, map):
-        return True
+    @staticmethod
+    def is_obstacle_edge(pixel):
+        pass
 
     # Store obstacles from map
     def generate_map(self, map):
@@ -90,10 +91,8 @@ class ParticleFilter:
         self.obstacles = []
         for h in range(map_img.shape[0]):
             for w in range(map_img.shape[1]):
-                if map_img[h, w] == 0 and self.is_obstacle_edge((h, w), map_img):
+                if map_img[h, w] == 0:
                     self.obstacles.append([w, h])
-                elif map_img[h, w] == 254:
-                    self.free.append([w, h])
         #print(self.obstacles)
         # TODO: BENJA: use is_obstacle_edge method to improve this
         self.distance_tree = spatial.KDTree(self.obstacles)

@@ -32,7 +32,7 @@ class DisplayState():
         rospy.Subscriber('/lidar_points', PointCloud, self.show_pointcloud)
         rospy.Subscriber('/location', Pose, self.set_location)
         rospy.Subscriber('/show_map', Empty, self.show_map)
-        rospy.Subscriber('/particles', PoseArray, self.show_particles)
+        rospy.Subscriber('/particles', PointCloud, self.show_particles)
 
     # Create map image
     def set_map(self, map):
@@ -55,7 +55,7 @@ class DisplayState():
         self.pub_map.publish(img_msg)
 
     # Show map
-    def show_map(self):
+    def show_map(self, map=None):
         map_copy = self.map.copy()
         self.draw_map.update_odom_pix()
         self.draw_map.draw_robot(map_copy)
@@ -72,10 +72,13 @@ class DisplayState():
 
     # Show particles in the map
     def show_particles(self, particle_data):
-        particles = particle_data.poses
+        points = particle_data.points
         map_copy = self.map.copy()
-        self.draw_map.draw_particles(map_copy, particles)
-        self.map = map_copy
+        self.draw_map.update_odom_pix()
+        self.draw_map.draw_robot(map_copy)
+        self.draw_map.draw_particles(map_copy, points)
+        img_msg = self.bridge.cv2_to_imgmsg(map_copy, 'bgr8')
+        self.pub_map.publish(img_msg)
 
 
 # Draw state
@@ -124,7 +127,6 @@ class DrawState():
         point_radius_pix = int(self.points_radius / self.resolution)
         for point in points:
             x, y = int(point.x), int(point.y)
-            rospy.loginfo((x,y))
             cv2.circle(map, (x, y), point_radius_pix, self.points_color, -1)
 
     # Draw current location
@@ -136,11 +138,11 @@ class DrawState():
         cv2.putText(map, f'({x}, {y})', (110, 60), font, 0.6, self.text_color, 1, cv2.LINE_AA)
 
     # Draw current particles
-    # TODO: Draw particles in the image, each with a color that represents the angle of it's pose (in some color scale)
+    # TODO(Done): Draw particles in the image, each with a color that represents the angle of it's pose (in some color scale)
     def draw_particles(self, map, particles):
         point_radius_pix = int(self.points_radius / self.resolution)
         for particle in particles:
-            x, y = int(particle.position.x), int(particle.position.y)
+            x, y = int(particle.x), int(particle.y)
             cv2.circle(map, (x, y), point_radius_pix, self.inner_points, -1)
 
 

@@ -34,7 +34,7 @@ class ParticleFilter:
         self.angular_speed = 0.0
         self.speed_msg = Twist()
 
-        # Map data
+        # Obstacles map
         self.map_info = None
         self.obstacles = []
         self.distance_tree = None
@@ -153,6 +153,7 @@ class ParticleFilter:
 
     # Particle filter algorithm (Monte Carlo localization)
     def particle_filter(self, states):
+        
         # TODO: Sample motion of particles (x_t[m]) (from gaussian sample)
         points_list = list()
         m = 50

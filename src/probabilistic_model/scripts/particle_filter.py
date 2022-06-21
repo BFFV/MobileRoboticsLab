@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
+import random
+from turtle import position
 import numpy as np
+import pandas as pd
 import rospy
-from geometry_msgs.msg import Pose, PoseArray, Twist
+from geometry_msgs.msg import Pose, PoseArray, Twist, Point32
 from nav_msgs.msg import OccupancyGrid
 from scipy import spatial
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, PointCloud
 
 
 # Particle filter model for localization
@@ -35,6 +38,7 @@ class ParticleFilter:
         self.map_info = None
         self.obstacles = []
         self.distance_tree = None
+        self.resolution = 0.01
 
         # Sensor
         self.sensor = None
@@ -148,9 +152,29 @@ class ParticleFilter:
 
     # Particle filter algorithm (Monte Carlo localization)
     def particle_filter(self, states):
+        
         # TODO: Sample motion of particles (x_t[m]) (from gaussian sample)
+        points_list = list()
+        m = 50
+        x = pd.Series(np.linspace(0.2, 0.8, m))/self.resolution
+        y = pd.Series(np.linspace(0.8, 2, m))/self.resolution
+        # x = pd.Series(random.choices(np.arange(0.2, 0.8, 0.1), m))/self.resolution
+        # y = pd.Series(random.choices(np.arange(0.2, 0.8, 0.1), m))/self.resolution
+        points = zip(x,y)
+        for x, y in points:
+            point = Pose()
+            # rospy.loginfo((x,y))
+            point.position.x, point.position.y = x, y
+            points_list.append(point)
+
+        point_cloud = PoseArray(poses=points_list)
+        self.particles_pub.publish(point_cloud)
 
         # TODO: Get measurement model weights (using sensor_model)
+
+        points = [] # Posibles valores a tomar (posiciones que estén en el piso)
+        dist = [] # Lista de mismo tamaño que positions
+        # draw = np.random.choice(positions, m, p=dist)
 
         # TODO: Finish testing
         translated_states = []

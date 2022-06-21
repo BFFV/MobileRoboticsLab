@@ -1,13 +1,13 @@
 <launch>
     <!--Soundplay-->
-    <include file="$(find sound_play)/soundplay_node.launch"/>
+    <!-- <include file="$(find sound_play)/soundplay_node.launch"/> -->
 
     <!--Nodes-->
     <node pkg="probabilistic_model" name="particle_filter" type="particle_filter.py" output="screen"/>
 
     <!--Display State-->
     <node pkg="visualization" name="odom_pix" type="odom_pix.py"/>
-    <node pkg="visualization" name="display_state" type="display_state.py"/>
+    <node pkg="visualization" name="display_state" type="display_state.py" output="screen"/>
     <node pkg="visualization" name="scan2pointcloud" type="scan2pointcloud.py"/>
     <node pkg="rqt_image_view" name="image_view_state" type="rqt_image_view" args="/img_map"/>
 </launch>

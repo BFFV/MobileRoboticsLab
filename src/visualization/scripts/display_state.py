@@ -84,6 +84,7 @@ class DrawState():
         # Colors
         self.robot_color = (0, 0, 255)     # red
         self.points_color = (0, 255, 0)    # green
+        self.inner_points = (255, 0, 0)    # blue
         self.line_color = (255, 255, 255)  # white
         self.text_color = (0, 0, 0)        # black
 
@@ -123,6 +124,7 @@ class DrawState():
         point_radius_pix = int(self.points_radius / self.resolution)
         for point in points:
             x, y = int(point.x), int(point.y)
+            rospy.loginfo((x,y))
             cv2.circle(map, (x, y), point_radius_pix, self.points_color, -1)
 
     # Draw current location
@@ -136,7 +138,10 @@ class DrawState():
     # Draw current particles
     # TODO: Draw particles in the image, each with a color that represents the angle of it's pose (in some color scale)
     def draw_particles(self, map, particles):
-        pass
+        point_radius_pix = int(self.points_radius / self.resolution)
+        for particle in particles:
+            x, y = int(particle.position.x), int(particle.position.y)
+            cv2.circle(map, (x, y), point_radius_pix, self.inner_points, -1)
 
 
 # Display current state

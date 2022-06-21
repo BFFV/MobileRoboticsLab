@@ -34,10 +34,11 @@ class ParticleFilter:
         self.angular_speed = 0.0
         self.speed_msg = Twist()
 
-        # Obstacles map
+        # Map data
         self.map_info = None
         self.obstacles = []
         self.distance_tree = None
+        self.free = []
         self.resolution = 0.01
 
         # Sensor
@@ -74,9 +75,8 @@ class ParticleFilter:
         rospy.Subscriber('/scan', LaserScan, self.set_sensor_data, queue_size=1)
 
     # TODO: BENJA: Detect if a pixel is an obstacle edge
-    @staticmethod
-    def is_obstacle_edge(pixel):
-        pass
+    def is_obstacle_edge(self, pixel, map):
+        return True
 
     # Store obstacles from map
     def generate_map(self, map):
@@ -90,8 +90,10 @@ class ParticleFilter:
         self.obstacles = []
         for h in range(map_img.shape[0]):
             for w in range(map_img.shape[1]):
-                if map_img[h, w] == 0:
+                if map_img[h, w] == 0 and self.is_obstacle_edge((h, w), map_img):
                     self.obstacles.append([w, h])
+                elif map_img[h, w] == 254:
+                    self.free.append([w, h])
         #print(self.obstacles)
         # TODO: BENJA: use is_obstacle_edge method to improve this
         self.distance_tree = spatial.KDTree(self.obstacles)
@@ -152,7 +154,6 @@ class ParticleFilter:
 
     # Particle filter algorithm (Monte Carlo localization)
     def particle_filter(self, states):
-        
         # TODO: Sample motion of particles (x_t[m]) (from gaussian sample)
         points_list = list()
         m = 50

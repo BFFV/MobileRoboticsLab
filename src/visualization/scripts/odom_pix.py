@@ -35,6 +35,7 @@ class OdomPixel():
         self.initialized = True
         self.init_x = pose_data.position.x
         self.init_y = pose_data.position.y
+        # TODO: add angle
 
     # Get data from odometry and transform into pixels
     def odom_pix(self, odom_data):
@@ -47,6 +48,7 @@ class OdomPixel():
                       pose_data.orientation.y,
                       pose_data.orientation.z,
                       pose_data.orientation.w)
+        # TODO: add angle
         _, _, yaw = euler_from_quaternion(quaternion)
         robot_ang = yaw
         pose_pix = Pose()

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import math
 import random
 from turtle import position
 import numpy as np
@@ -30,9 +31,12 @@ class ParticleFilter:
         self.hz = 10
         self.rate_obj = rospy.Rate(self.hz)
 
+        self.angle = 0
+        self.angle_old = 0
+
         # Speed message for actuation
         self.linear_speed = 0.0
-        self.angular_speed = 0.0
+        self.angular_speed = 0.1
         self.speed_msg = Twist()
 
         # Obstacles map
@@ -75,6 +79,13 @@ class ParticleFilter:
 
         # Read sensor data
         rospy.Subscriber('/scan', LaserScan, self.set_sensor_data, queue_size=1)
+
+        # ODOM
+        rospy.Subscriber('/real_pose', Pose, self.set_init_pose)
+
+    # Set initial pose
+    def set_init_pose(self, pose_data):
+        self.angle = pose_data.orientation.z
 
     # TODO: BENJA: Detect if a pixel is an obstacle edge
     def is_obstacle_edge(self, pixel, map):
@@ -156,32 +167,25 @@ class ParticleFilter:
 
     # Particle filter algorithm (Monte Carlo localization)
     def particle_filter(self, states):
+        
+        ideal_distance = self.linear_speed * (1/self.hz)
+        # ideal_angle = self.angular_speed * (1/self.hz)
+        
+        linear = np.random.normal(ideal_distance, ideal_distance*0.1)
+        # angle = np.random.normal(ideal_angle, ideal_angle*0.1)
 
-        # TODO(Done): Sample motion of particles (x_t[m]) (from gaussian sample)
-        points = np.random.choice(self.free, self.n_particles, self.weights)
-        point_cloud = PointCloud(points=points)
-        self.particles_pub.publish(point_cloud)
+        # x = math.cos(angle) * linear
+        # y = math.sin(angle) * linear
 
-        # Sincronizar el movimiento con el sensor
+        translated_states = [Point32(x=round(state.x + np.random.normal(ideal_distance, ideal_distance*0.1)), y=round(state.y)) for state in states]
+        [point for point in translated_states if [point.x, point.y] in self.free]
 
-        # TODO: Get measurement model weights (using sensor_model) {Lukas: WTF is this dude}
-
-        # TODO: Finish testing
-        translated_states = []
-        for i in range(0, 2):
-            state = Pose()
-            state.position.x = 50
-            state.position.y = 50 + i * 60
-            state.orientation.z = 0
-            translated_states.append(state)
         self.weights = self.sensor_model(translated_states, self.sensor)
-        print(self.weights)
+        # print(self.weights)
         rospy.sleep(5)
 
-        # TODO(Done): Resampling of particles
         new_points = np.random.choice(self.free, self.n_particles, self.weights)
-        # TODO(Done): Return particles
-        return new_points  # TODO: replace this with the real updated particles {lukas: ?????}
+        return new_points
 
     # Main loop
     def run(self):
@@ -196,8 +200,8 @@ class ParticleFilter:
             # Particle filter iteration
             
             particles = self.particle_filter(particles)
-            # TODO(Done): Complete the "draw_particles" method in "display_state.py" from the "visualization" package
-            # TODO(Done): Publish current particles as a PoseArray with particles_pub (with the above method completed they will be displayed)
+            # point_cloud = PointCloud(points=particles)
+            # self.particles_pub.publish(point_cloud)
 
             located = False  # TODO: STOPPING CRITERION: Check if the particles converge into a single point
             if located:  # The robot has successfully located itself
@@ -217,14 +221,11 @@ class ParticleFilter:
                 """
                 # TODO: play sound to say that the robot has located itself (sound play)
             else:
-                rospy.loginfo("pepe")
-                self.speed_msg.linear.x = 1
-                self.speed_msg.angular.z = 0
+                self.speed_msg.linear.x = self.linear_speed
+                self.speed_msg.angular.z = self.angular_speed
                 self.cmd_vel_mux_pub.publish(self.speed_msg)
                 self.rate_obj.sleep()
-                # TODO(Done): Resume movement until the next particle filter iteration
                 # TODO(Refactor, linear speed better): Move robot reactively with a PID controller to be at a fixed distance from a wall
-                pass
             self.rate_obj.sleep()
 
 

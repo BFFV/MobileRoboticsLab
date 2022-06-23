@@ -6,6 +6,8 @@ from geometry_msgs.msg import Pose, PoseArray, Twist
 from nav_msgs.msg import OccupancyGrid
 from scipy import spatial
 from sensor_msgs.msg import LaserScan
+from time import time
+from tf.transformations import euler_from_quaternion  # TODO: remove
 
 
 # Particle filter model for localization
@@ -21,24 +23,23 @@ class ParticleFilter:
 
     # Initialize variables
     def variables_init(self):
-        # Message frequency: 10Hz
-        self.hz = 10
-        self.rate_obj = rospy.Rate(self.hz)
-
         # TODO: remove later
         self.angle = 0
         self.angle_old = 0
 
-        # Speed message for actuation
+        # Actuation
         self.linear_speed = 0.1
         self.angular_speed = 0.0
         self.speed_msg = Twist()
+        self.timer = None
 
-        # Obstacles map
+        # Map
         self.map_info = None
+        self.resolution = 0.01
         self.obstacles = []
         self.distance_tree = None
         self.free = []
+        self.valid = set()
 
         # Sensor
         self.sensor = None
@@ -78,7 +79,12 @@ class ParticleFilter:
 
     # TODO: remove later, Set initial pose
     def set_init_pose(self, pose_data):
-        self.angle = pose_data.orientation.z
+        quaternion = (pose_data.orientation.x,
+                      pose_data.orientation.y,
+                      pose_data.orientation.z,
+                      pose_data.orientation.w)
+        _, _, yaw = euler_from_quaternion(quaternion)
+        self.angle = yaw
 
     # Detect if a pixel is an obstacle edge
     def is_obstacle_edge(self, pixel, map):
@@ -112,6 +118,7 @@ class ParticleFilter:
                     free_pose.position.x = w
                     free_pose.position.y = h
                     self.free.append(free_pose)
+                    self.valid.add((w, h))
         self.distance_tree = spatial.KDTree(self.obstacles)
 
     # Set sensor data
@@ -167,25 +174,37 @@ class ParticleFilter:
 
     # Particle filter algorithm (Monte Carlo localization)
     def particle_filter(self, states):
+        # Get action time
+        action_time = 0
+        if self.timer:
+            action_time = time() - self.timer
 
-        ideal_distance = self.linear_speed * (1/self.hz)
-        # ideal_angle = self.angular_speed * (1/self.hz)
+        # Motion model
+        if action_time:
+            if self.angular_speed:
+                ideal_angle = self.angular_speed * action_time
+                angular = np.random.normal(ideal_angle, abs(ideal_angle * 0.5))
+                # TODO: check this
+                states[idx].orientation.z += angular
+            if self.linear_speed:
+                ideal_distance = (self.linear_speed * action_time) / self.resolution
+                linear = round(np.random.normal(ideal_distance, ideal_distance * 0.8))
+                for idx in range(self.n_particles):
+                    # TODO: formula for every possible angle
+                    current_angle = states[idx].orientation.z
+                    states[idx].position.x += round(linear * np.cos(current_angle))
+                    states[idx].position.y += round(linear * np.sin(current_angle))
 
-        linear = np.random.normal(ideal_distance, ideal_distance*0.1)
-        # angle = np.random.normal(ideal_angle, ideal_angle*0.1)
+        # TODO: test all this
+        # Filter invalid translated states
+        translated_states = np.array([point for point in states if (point.position.x, point.position.y) in self.valid])
 
-        # x = math.cos(angle) * linear
-        # y = math.sin(angle) * linear
-
-        #translated_states = [Point32(x=round(state.x + np.random.normal(ideal_distance, ideal_distance*0.1)), y=round(state.y)) for state in states]
-        #[point for point in translated_states if [point.x, point.y] in self.free]
-
-        #self.weights = self.sensor_model(translated_states, self.sensor)
-        # print(self.weights)
-        rospy.sleep(3)
-
-        new_states = np.random.choice(self.free, self.n_particles)
-        return new_states
+        # Sensor model
+        #weights = self.sensor_model(translated_states, self.sensor)
+        #print(self.weights)
+        rospy.sleep(1)
+        #return np.random.choice(translated_states, self.n_particles, weights)
+        return np.random.choice(translated_states, self.n_particles)
 
     # Main loop
     def run(self):
@@ -228,8 +247,10 @@ class ParticleFilter:
                 self.speed_msg.linear.x = self.linear_speed
                 self.speed_msg.angular.z = self.angular_speed
                 self.cmd_vel_mux_pub.publish(self.speed_msg)
+                self.timer = time()
+                rospy.sleep(0.1)
                 # TODO(Refactor, linear speed better): Move robot reactively with a PID controller to be at a fixed distance from a wall
-            self.rate_obj.sleep()
+
 
 
 # Run particle filter

@@ -20,6 +20,7 @@ class OdomPixel():
         self.map_height = 270
         self.init_x = 0.5
         self.init_y = 0.5
+        self.init_angle = 0
         self.initialized = False
 
     # Initialize connections
@@ -35,7 +36,11 @@ class OdomPixel():
         self.initialized = True
         self.init_x = pose_data.position.x
         self.init_y = pose_data.position.y
-        # TODO: add angle
+        quaternion = (pose_data.orientation.x,
+                      pose_data.orientation.y,
+                      pose_data.orientation.z,
+                      pose_data.orientation.w)
+        _, _, self.init_angle = euler_from_quaternion(quaternion)
 
     # Get data from odometry and transform into pixels
     def odom_pix(self, odom_data):
@@ -48,9 +53,8 @@ class OdomPixel():
                       pose_data.orientation.y,
                       pose_data.orientation.z,
                       pose_data.orientation.w)
-        # TODO: add angle
         _, _, yaw = euler_from_quaternion(quaternion)
-        robot_ang = yaw
+        robot_ang = yaw + self.init_angle
         pose_pix = Pose()
         pose_pix.position.x = robot_x_pix
         pose_pix.position.y = robot_y_pix

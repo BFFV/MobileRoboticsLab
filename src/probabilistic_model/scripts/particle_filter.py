@@ -1,25 +1,19 @@
 #!/usr/bin/env python
 
-import math
-import random
-from turtle import position
 import numpy as np
-import pandas as pd
 import rospy
-from geometry_msgs.msg import Pose, PoseArray, Twist, Point32
+from geometry_msgs.msg import Pose, PoseArray, Twist
 from nav_msgs.msg import OccupancyGrid
 from scipy import spatial
-from sensor_msgs.msg import LaserScan, PointCloud
+from sensor_msgs.msg import LaserScan
 
 
 # Particle filter model for localization
 class ParticleFilter:
-
     def __init__(self):
         rospy.init_node('particle_filter')
         self.variables_init()
         self.connections_init()
-        rospy.sleep(3)
         while not self.distance_tree:
             rospy.sleep(1)
         self.run()
@@ -31,12 +25,13 @@ class ParticleFilter:
         self.hz = 10
         self.rate_obj = rospy.Rate(self.hz)
 
+        # TODO: remove later
         self.angle = 0
         self.angle_old = 0
 
         # Speed message for actuation
-        self.linear_speed = 0.0
-        self.angular_speed = 0.1
+        self.linear_speed = 0.1
+        self.angular_speed = 0.0
         self.speed_msg = Twist()
 
         # Obstacles map
@@ -44,17 +39,15 @@ class ParticleFilter:
         self.obstacles = []
         self.distance_tree = None
         self.free = []
-        self.resolution = 0.01
 
         # Sensor
         self.sensor = None
-        self.z_hit = 15
+        self.z_hit = 13
         self.z_random = 0
         self.z_max = 0.001
 
         # Particle filter parameters
-        self.n_particles = 50
-        self.weights = [1/self.n_particles]*self.n_particles
+        self.n_particles = 5
         # TODO: Add params for the particle filter
         """
         # IDEA: Use this to spawn "self.n_random" random particles every "self.random_frequency" iterations
@@ -69,7 +62,7 @@ class ParticleFilter:
         self.cmd_vel_mux_pub = rospy.Publisher('/yocs_cmd_vel_mux/input/navigation', Twist, queue_size=10)
 
         # Show particles
-        self.particles_pub = rospy.Publisher('/particles', PointCloud, queue_size=1)
+        self.particles_pub = rospy.Publisher('/particles', PoseArray, queue_size=1)
 
         # Show location when finished
         self.location_pub = rospy.Publisher('/location', Pose, queue_size=1)
@@ -80,16 +73,25 @@ class ParticleFilter:
         # Read sensor data
         rospy.Subscriber('/scan', LaserScan, self.set_sensor_data, queue_size=1)
 
-        # ODOM
+        # TODO: remove later, ODOM
         rospy.Subscriber('/real_pose', Pose, self.set_init_pose)
 
-    # Set initial pose
+    # TODO: remove later, Set initial pose
     def set_init_pose(self, pose_data):
         self.angle = pose_data.orientation.z
 
-    # TODO: BENJA: Detect if a pixel is an obstacle edge
+    # Detect if a pixel is an obstacle edge
     def is_obstacle_edge(self, pixel, map):
-        return True
+        for y_idx in range(-1, 2):
+            for x_idx in range(-1, 2):
+                if y_idx == 0 and x_idx == 0:
+                    continue
+                adjacent_pixel = list(pixel)
+                adjacent_pixel[0] += y_idx
+                adjacent_pixel[1] += x_idx
+                if map[adjacent_pixel[0], adjacent_pixel[1]] == 254:
+                    return True
+        return False
 
     # Store obstacles from map
     def generate_map(self, map):
@@ -106,9 +108,10 @@ class ParticleFilter:
                 if map_img[h, w] == 0 and self.is_obstacle_edge((h, w), map_img):
                     self.obstacles.append([w, h])
                 elif map_img[h, w] == 254:
-                    self.free.append(Point32(x=w, y=h))
-        #print(self.obstacles)
-        # TODO: BENJA: use is_obstacle_edge method to improve this
+                    free_pose = Pose()
+                    free_pose.position.x = w
+                    free_pose.position.y = h
+                    self.free.append(free_pose)
         self.distance_tree = spatial.KDTree(self.obstacles)
 
     # Set sensor data
@@ -155,42 +158,44 @@ class ParticleFilter:
             # Calculate distance to closest obstacles (assuming laser points from state)
             distances, _ = self.distance_tree.query(laser_points)
 
-            # TODO: BENJA: improve gaussian with the obstacle edge change
-            # TODO: BENJA: test different states likelihood (and adjust params)
-
             # Get likelihood according to expected distribution of distances
             for dist in distances:
-                p_hit = self.gaussian(dist, 0, 5)
+                p_hit = self.gaussian(dist, 0, 3)
                 likelihood *= self.z_hit * p_hit + self.z_random / self.z_max
             states_likelihood.append(likelihood)
         return states_likelihood
 
     # Particle filter algorithm (Monte Carlo localization)
     def particle_filter(self, states):
-        
+
         ideal_distance = self.linear_speed * (1/self.hz)
         # ideal_angle = self.angular_speed * (1/self.hz)
-        
+
         linear = np.random.normal(ideal_distance, ideal_distance*0.1)
         # angle = np.random.normal(ideal_angle, ideal_angle*0.1)
 
         # x = math.cos(angle) * linear
         # y = math.sin(angle) * linear
 
-        translated_states = [Point32(x=round(state.x + np.random.normal(ideal_distance, ideal_distance*0.1)), y=round(state.y)) for state in states]
-        [point for point in translated_states if [point.x, point.y] in self.free]
+        #translated_states = [Point32(x=round(state.x + np.random.normal(ideal_distance, ideal_distance*0.1)), y=round(state.y)) for state in states]
+        #[point for point in translated_states if [point.x, point.y] in self.free]
 
-        self.weights = self.sensor_model(translated_states, self.sensor)
+        #self.weights = self.sensor_model(translated_states, self.sensor)
         # print(self.weights)
-        rospy.sleep(5)
+        rospy.sleep(3)
 
-        new_points = np.random.choice(self.free, self.n_particles, self.weights)
-        return new_points
+        new_states = np.random.choice(self.free, self.n_particles)
+        return new_states
 
     # Main loop
     def run(self):
         located = False
-        particles = np.random.choice(self.free, self.n_particles, self.weights)
+
+        # Initialize particles
+        particles = np.random.choice(self.free, self.n_particles)
+        self.particles_pub.publish(PoseArray(poses=particles))
+
+        # Start iterations
         while not located:
             # Stop the robot
             self.speed_msg.linear.x = 0
@@ -198,12 +203,11 @@ class ParticleFilter:
             self.cmd_vel_mux_pub.publish(self.speed_msg)
 
             # Particle filter iteration
-            
             particles = self.particle_filter(particles)
-            # point_cloud = PointCloud(points=particles)
-            # self.particles_pub.publish(point_cloud)
+            self.particles_pub.publish(PoseArray(poses=particles))
 
-            located = False  # TODO: STOPPING CRITERION: Check if the particles converge into a single point
+            # TODO: Check if the particles have converged
+            located = False
             if located:  # The robot has successfully located itself
                 # Stop the robot
                 self.speed_msg.linear.x = 0
@@ -224,7 +228,6 @@ class ParticleFilter:
                 self.speed_msg.linear.x = self.linear_speed
                 self.speed_msg.angular.z = self.angular_speed
                 self.cmd_vel_mux_pub.publish(self.speed_msg)
-                self.rate_obj.sleep()
                 # TODO(Refactor, linear speed better): Move robot reactively with a PID controller to be at a fixed distance from a wall
             self.rate_obj.sleep()
 

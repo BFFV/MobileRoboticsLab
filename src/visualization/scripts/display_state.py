@@ -23,7 +23,7 @@ class DisplayState():
         self.draw_map = DrawState()
         self.bridge = CvBridge()
         self.map = None
-        self.point_cloud = None
+        self.fresh_map = None
 
     # Initialize connections
     def connections_init(self):
@@ -32,7 +32,7 @@ class DisplayState():
         rospy.Subscriber('/lidar_points', PointCloud, self.show_pointcloud)
         rospy.Subscriber('/location', Pose, self.set_location)
         rospy.Subscriber('/show_map', Empty, self.show_map)
-        rospy.Subscriber('/particles', PointCloud, self.show_particles)
+        rospy.Subscriber('/particles', PoseArray, self.show_particles)
 
     # Create map image
     def set_map(self, map):
@@ -43,6 +43,7 @@ class DisplayState():
         map_img = 100 - np_map
         map_img = (map_img * (255 / 100.0)).astype(np.uint8)
         self.map = cv2.cvtColor(map_img, cv2.COLOR_GRAY2RGB)
+        self.fresh_map = self.map.copy()
 
     # Show laser points in the map
     def show_pointcloud(self, pointcloud):
@@ -55,7 +56,7 @@ class DisplayState():
         self.pub_map.publish(img_msg)
 
     # Show map
-    def show_map(self, map=None):
+    def show_map(self):
         map_copy = self.map.copy()
         self.draw_map.update_odom_pix()
         self.draw_map.draw_robot(map_copy)
@@ -69,16 +70,14 @@ class DisplayState():
         map_copy = self.map.copy()
         self.draw_map.draw_location(map_copy, location)
         self.map = map_copy
+        self.fresh_map = self.map.copy()
 
     # Show particles in the map
     def show_particles(self, particle_data):
-        points = particle_data.points
-        map_copy = self.map.copy()
-        self.draw_map.update_odom_pix()
-        self.draw_map.draw_robot(map_copy)
-        self.draw_map.draw_particles(map_copy, points)
-        img_msg = self.bridge.cv2_to_imgmsg(map_copy, 'bgr8')
-        self.pub_map.publish(img_msg)
+        particles = particle_data.poses
+        map_copy = self.fresh_map.copy()
+        self.draw_map.draw_particles(map_copy, particles)
+        self.map = map_copy
 
 
 # Draw state
@@ -87,7 +86,7 @@ class DrawState():
         # Colors
         self.robot_color = (0, 0, 255)     # red
         self.points_color = (0, 255, 0)    # green
-        self.inner_points = (255, 0, 0)    # blue
+        self.particles_color = (255, 0, 0) # blue
         self.line_color = (255, 255, 255)  # white
         self.text_color = (0, 0, 0)        # black
 
@@ -138,12 +137,12 @@ class DrawState():
         cv2.putText(map, f'({x}, {y})', (110, 60), font, 0.6, self.text_color, 1, cv2.LINE_AA)
 
     # Draw current particles
-    # TODO(Done): Draw particles in the image, each with a color that represents the angle of it's pose (in some color scale)
+    # TODO: Add angle of each particle in some color scale
     def draw_particles(self, map, particles):
         point_radius_pix = int(self.points_radius / self.resolution)
         for particle in particles:
-            x, y = int(particle.x), int(particle.y)
-            cv2.circle(map, (x, y), point_radius_pix, self.inner_points, -1)
+            x, y = int(particle.position.x), int(particle.position.y)
+            cv2.circle(map, (x, y), point_radius_pix, self.particles_color, -1)
 
 
 # Display current state

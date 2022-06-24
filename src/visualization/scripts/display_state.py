@@ -50,7 +50,7 @@ class DisplayState():
         points = pointcloud.points
         map_copy = self.map.copy()
         self.draw_map.update_odom_pix()
-        self.draw_map.draw_robot(map_copy)
+        # self.draw_map.draw_robot(map_copy)
         self.draw_map.draw_point_cloud(map_copy, points)
         img_msg = self.bridge.cv2_to_imgmsg(map_copy, 'bgr8')
         self.pub_map.publish(img_msg)
@@ -59,7 +59,7 @@ class DisplayState():
     def show_map(self):
         map_copy = self.map.copy()
         self.draw_map.update_odom_pix()
-        self.draw_map.draw_robot(map_copy)
+        # self.draw_map.draw_robot(map_copy)
         if self.location:
             self.draw_map.draw_location(map_copy, self.location)
         img_msg = self.bridge.cv2_to_imgmsg(map_copy, 'bgr8')

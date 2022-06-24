@@ -48,7 +48,7 @@ class ParticleFilter:
         self.z_max = 0.001
 
         # Particle filter parameters
-        self.n_particles = 5
+        self.n_particles = 100
         # TODO: Add params for the particle filter
         """
         # IDEA: Use this to spawn "self.n_random" random particles every "self.random_frequency" iterations
@@ -163,6 +163,9 @@ class ParticleFilter:
             laser_points = self.laser_scan(state, measurements)
 
             # Calculate distance to closest obstacles (assuming laser points from state)
+            if len(laser_points) == 0:
+                print("asdasd",laser_points)
+                print("state",state)
             distances, _ = self.distance_tree.query(laser_points)
 
             # Get likelihood according to expected distribution of distances
@@ -198,21 +201,34 @@ class ParticleFilter:
         # TODO: test all this
         # Filter invalid translated states
         translated_states = np.array([point for point in states if (point.position.x, point.position.y) in self.valid])
+        out_of_boundry_points = len(states) - len(translated_states)
+        
+        new_points = np.random.choice(self.free, out_of_boundry_points)
+
+        translated_states = np.append(translated_states, new_points)
 
         # Sensor model
-        #weights = self.sensor_model(translated_states, self.sensor)
+        weights = self.sensor_model(translated_states, self.sensor)
         #print(self.weights)
         rospy.sleep(1)
-        #return np.random.choice(translated_states, self.n_particles, weights)
-        return np.random.choice(translated_states, self.n_particles)
+        return np.random.choice(translated_states, self.n_particles, weights)
+        # return np.random.choice(translated_states, self.n_particles)
 
     # Main loop
     def run(self):
         located = False
 
         # Initialize particles
-        particles = np.random.choice(self.free, self.n_particles)
+
+        # Testing
+        state = Pose()
+        state.position.x, state.position.y = 249, 237
+        particles = np.array([state]*100)
         self.particles_pub.publish(PoseArray(poses=particles))
+        
+        # Production
+        # particles = np.random.choice(self.free, self.n_particles)
+        # self.particles_pub.publish(PoseArray(poses=particles))
 
         # Start iterations
         while not located:
@@ -244,11 +260,12 @@ class ParticleFilter:
                 """
                 # TODO: play sound to say that the robot has located itself (sound play)
             else:
+                print()
                 self.speed_msg.linear.x = self.linear_speed
                 self.speed_msg.angular.z = self.angular_speed
                 self.cmd_vel_mux_pub.publish(self.speed_msg)
-                self.timer = time()
                 rospy.sleep(0.1)
+                self.timer = time()
                 # TODO(Refactor, linear speed better): Move robot reactively with a PID controller to be at a fixed distance from a wall
 
 

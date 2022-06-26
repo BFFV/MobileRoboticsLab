@@ -33,7 +33,7 @@ class Scan2PointCloud():
 
     # Set laser measurements
     def laser_scan_hd(self, scan):
-        self.update_odom_pix()
+        self.update_real_pose_pix()
         num_angles = int((scan.angle_max - scan.angle_min) / scan.angle_increment)
         angles = np.linspace(scan.angle_min, scan.angle_max, num_angles)
         point_cloud = PointCloud()
@@ -50,12 +50,12 @@ class Scan2PointCloud():
                 point_cloud.points.append(point)
         self.pub_pcl.publish(point_cloud)
 
-    # Update position with odometry
-    def update_odom_pix(self):
-        odom_pix_data = rospy.wait_for_message('/odom_pix', Pose, timeout=3)
-        self.robot_x_pix = int(odom_pix_data.position.x)
-        self.robot_y_pix = int(odom_pix_data.position.y)
-        self.robot_ang = odom_pix_data.orientation.z
+    # Update position with real pose
+    def update_real_pose_pix(self):
+        real_pose_pix_data = rospy.wait_for_message('/real_pose_pix', Pose, timeout=3)
+        self.robot_x_pix = int(real_pose_pix_data.position.x)
+        self.robot_y_pix = int(real_pose_pix_data.position.y)
+        self.robot_ang = real_pose_pix_data.orientation.z
 
 
 # Obtain laser measurements

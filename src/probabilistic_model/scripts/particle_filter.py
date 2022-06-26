@@ -2,12 +2,13 @@
 
 import numpy as np
 import rospy
+from collections import Counter
 from geometry_msgs.msg import Pose, PoseArray, Twist
 from nav_msgs.msg import OccupancyGrid
+from random import choices, uniform
 from scipy import spatial
 from sensor_msgs.msg import LaserScan
 from time import time
-from tf.transformations import euler_from_quaternion  # TODO: remove
 
 
 # Particle filter model for localization
@@ -23,12 +24,8 @@ class ParticleFilter:
 
     # Initialize variables
     def variables_init(self):
-        # TODO: remove later
-        self.angle = 0
-        self.angle_old = 0
-
         # Actuation
-        self.linear_speed = 0.1
+        self.linear_speed = 0.2
         self.angular_speed = 0.0
         self.speed_msg = Twist()
         self.timer = None
@@ -43,19 +40,17 @@ class ParticleFilter:
 
         # Sensor
         self.sensor = None
-        self.z_hit = 13
+        self.z_hit = 12
         self.z_random = 0
         self.z_max = 0.001
 
         # Particle filter parameters
-        self.n_particles = 100
-        # TODO: Add params for the particle filter
-        """
-        # IDEA: Use this to spawn "self.n_random" random particles every "self.random_frequency" iterations
-        # This is to avoid trapping the robot if it has bad luck with the clustering of particles in the wrong place
-        #self.n_random = 5
-        #self.random_frequency = 5
-        """
+        # TODO: Adjust to improve localization
+        self.n_particles = 5000
+        self.confidence_likelihood = 10 ** (1)  # Any particles with less likelihood will be replaced by random ones
+        self.default_likelihood = 1 / self.n_particles  # The default likelihood for new random particles
+        self.invalid_threshold = 0.9  # The min proportion of valid laser points to consider a state in the likelihood calculation
+        self.localization_threshold = 0.9  # The proportion of equal particles to assume that the location has been found
 
     # Initialize connections
     def connections_init(self):
@@ -73,18 +68,6 @@ class ParticleFilter:
 
         # Read sensor data
         rospy.Subscriber('/scan', LaserScan, self.set_sensor_data, queue_size=1)
-
-        # TODO: remove later, ODOM
-        rospy.Subscriber('/real_pose', Pose, self.set_init_pose)
-
-    # TODO: remove later, Set initial pose
-    def set_init_pose(self, pose_data):
-        quaternion = (pose_data.orientation.x,
-                      pose_data.orientation.y,
-                      pose_data.orientation.z,
-                      pose_data.orientation.w)
-        _, _, yaw = euler_from_quaternion(quaternion)
-        self.angle = yaw
 
     # Detect if a pixel is an obstacle edge
     def is_obstacle_edge(self, pixel, map):
@@ -119,7 +102,7 @@ class ParticleFilter:
                     free_pose.position.y = h
                     self.free.append(free_pose)
                     self.valid.add((w, h))
-        self.distance_tree = spatial.KDTree(self.obstacles)
+        self.distance_tree = spatial.cKDTree(self.obstacles)
 
     # Set sensor data
     def set_sensor_data(self, sensor_data):
@@ -134,6 +117,7 @@ class ParticleFilter:
 
         # Calculate laser points
         laser_points = []
+        n_valid_measurements = 0
         num_angles = int((scan.angle_max - scan.angle_min) / scan.angle_increment)
         angles = np.linspace(scan.angle_min, scan.angle_max, num_angles)
         for z_ang, zk in zip(angles, scan.ranges):
@@ -145,7 +129,9 @@ class ParticleFilter:
             px_in_range = 0 < px_pix < self.map_info.width
             if px_in_range and py_in_range and zk < scan.range_max:
                 laser_points.append((px_pix, py_pix))
-        return laser_points
+            if zk < scan.range_max:
+                n_valid_measurements += 1
+        return laser_points, n_valid_measurements
 
     # Normal distribution
     @staticmethod
@@ -160,12 +146,14 @@ class ParticleFilter:
             likelihood = 1
 
             # Get laser points (assuming state)
-            laser_points = self.laser_scan(state, measurements)
+            laser_points, n_valid = self.laser_scan(state, measurements)
+
+            # State lacks valid information (directly incompatible)
+            if len(laser_points) < n_valid * self.invalid_threshold:
+                states_likelihood.append(0.0)
+                continue
 
             # Calculate distance to closest obstacles (assuming laser points from state)
-            if len(laser_points) == 0:
-                print("asdasd",laser_points)
-                print("state",state)
             distances, _ = self.distance_tree.query(laser_points)
 
             # Get likelihood according to expected distribution of distances
@@ -185,50 +173,65 @@ class ParticleFilter:
         # Motion model
         if action_time:
             if self.angular_speed:
-                ideal_angle = self.angular_speed * action_time
-                angular = np.random.normal(ideal_angle, abs(ideal_angle * 0.5))
-                # TODO: check this
-                states[idx].orientation.z += angular
+                ideal_angle = abs(self.angular_speed) * action_time
+                for state in states:
+                    angular = max(np.random.normal(ideal_angle * 0.92, ideal_angle * 0.35), 0)
+                    if self.angular_speed < 0:
+                        angular *= -1
+                    state.orientation.z += angular
+                    state.orientation.z %= 2 * np.pi
             if self.linear_speed:
                 ideal_distance = (self.linear_speed * action_time) / self.resolution
-                linear = round(np.random.normal(ideal_distance, ideal_distance * 0.8))
-                for idx in range(self.n_particles):
-                    # TODO: formula for every possible angle
-                    current_angle = states[idx].orientation.z
-                    states[idx].position.x += round(linear * np.cos(current_angle))
-                    states[idx].position.y += round(linear * np.sin(current_angle))
+                for state in states:
+                    linear = max(np.random.normal(ideal_distance * 1.1, ideal_distance * 0.05), 0)
+                    current_angle = state.orientation.z
+                    state.position.x += round(linear * np.cos(current_angle))
+                    state.position.y -= round(linear * np.sin(current_angle))
 
-        # TODO: test all this
-        # Filter invalid translated states
-        translated_states = np.array([point for point in states if (point.position.x, point.position.y) in self.valid])
-        out_of_boundry_points = len(states) - len(translated_states)
-        
-        new_points = np.random.choice(self.free, out_of_boundry_points)
-
-        translated_states = np.append(translated_states, new_points)
+        # Replace invalid particles with random ones
+        translated_states = []
+        for state in states:
+            if (state.position.x, state.position.y) in self.valid:
+                translated_states.append(state)
+            else:
+                random_state = choices(self.free, k=1)[0]
+                rand = Pose()
+                rand.position.x, rand.position.y = random_state.position.x, random_state.position.y
+                rand.orientation.z = uniform(0, 2 * np.pi - 1)
+                translated_states.append(rand)
 
         # Sensor model
         weights = self.sensor_model(translated_states, self.sensor)
-        #print(self.weights)
-        rospy.sleep(1)
-        return np.random.choice(translated_states, self.n_particles, weights)
-        # return np.random.choice(translated_states, self.n_particles)
+
+        # Replace unlikely particles with random ones
+        for idx, state in enumerate(translated_states):
+            if weights[idx] < self.confidence_likelihood:
+                rand = choices(self.free, k=1)[0]
+                translated_states[idx].position.x, translated_states[idx].position.y = rand.position.x, rand.position.y
+                translated_states[idx].orientation.z = uniform(0, 2 * np.pi - 1)
+                weights[idx] = self.default_likelihood
+
+        # Resampling using weights
+        new_particles = []
+        for p in choices(translated_states, weights=weights, k=self.n_particles):
+            new_particle = Pose()
+            new_particle.position.x, new_particle.position.y = p.position.x, p.position.y
+            new_particle.orientation.z = p.orientation.z
+            new_particles.append(new_particle)
+        return new_particles
 
     # Main loop
     def run(self):
         located = False
 
         # Initialize particles
-
-        # Testing
-        state = Pose()
-        state.position.x, state.position.y = 249, 237
-        particles = np.array([state]*100)
+        particles = []
+        for p in choices(self.free, k=self.n_particles):
+            particle = Pose()
+            particle.position.x, particle.position.y = p.position.x, p.position.y
+            particle.orientation.z = uniform(0, 2 * np.pi - 1)
+            particles.append(particle)
         self.particles_pub.publish(PoseArray(poses=particles))
-        
-        # Production
-        # particles = np.random.choice(self.free, self.n_particles)
-        # self.particles_pub.publish(PoseArray(poses=particles))
 
         # Start iterations
         while not located:
@@ -241,8 +244,9 @@ class ParticleFilter:
             particles = self.particle_filter(particles)
             self.particles_pub.publish(PoseArray(poses=particles))
 
-            # TODO: Check if the particles have converged
-            located = False
+            # Check if the particles have converged
+            loc, count = Counter([(p.position.x, p.position.y) for p in particles]).most_common(1)[0]
+            located = count >= self.localization_threshold * self.n_particles
             if located:  # The robot has successfully located itself
                 # Stop the robot
                 self.speed_msg.linear.x = 0
@@ -250,24 +254,17 @@ class ParticleFilter:
                 self.cmd_vel_mux_pub.publish(self.speed_msg)
 
                 # Display robot localization
-                """
-                # This code will show the location found on the state image
-                # Use it when the particle filter has finished and found a probable pose (x,y)
                 location = Pose()
-                location.position.x = the x value for the position found
-                location.position.y = the y value for the position found
+                location.position.x, location.position.y = loc
                 self.location_pub.publish(location)
-                """
                 # TODO: play sound to say that the robot has located itself (sound play)
             else:
-                print()
                 self.speed_msg.linear.x = self.linear_speed
                 self.speed_msg.angular.z = self.angular_speed
                 self.cmd_vel_mux_pub.publish(self.speed_msg)
-                rospy.sleep(0.1)
                 self.timer = time()
-                # TODO(Refactor, linear speed better): Move robot reactively with a PID controller to be at a fixed distance from a wall
-
+                rospy.sleep(0.2)
+                # TODO: better movement
 
 
 # Run particle filter

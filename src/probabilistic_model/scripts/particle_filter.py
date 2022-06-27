@@ -2,10 +2,11 @@
 
 import numpy as np
 import rospy
-from collections import Counter
+from collections import Counter, deque
 from geometry_msgs.msg import Pose, PoseArray, Twist
 from nav_msgs.msg import OccupancyGrid
-from random import choices, uniform
+from pid_controller import PIDController
+from random import choices, uniform, random
 from scipy import spatial
 from sensor_msgs.msg import LaserScan
 from time import time
@@ -25,10 +26,17 @@ class ParticleFilter:
     # Initialize variables
     def variables_init(self):
         # Actuation
-        self.linear_speed = 0.2
-        self.angular_speed = 0.0
+        self.linear_speed = 0.2  # Linear speed when following wall
+        self.angular_speed = 0.5  # Angular speed when changing direction
         self.speed_msg = Twist()
         self.timer = None
+        self.changing_direction = False
+        self.free_distance = 0.7
+        self.blocked_distance = 0.4
+        self.wall_distance = 0.7
+        self.wall_tracker = PIDController('wall_tracker')
+        self.wall_tracker.pub_set_point(self.wall_distance)
+        self.right_distances = deque(maxlen=5)
 
         # Map
         self.map_info = None
@@ -45,12 +53,13 @@ class ParticleFilter:
         self.z_max = 0.001
 
         # Particle filter parameters
-        # TODO: Adjust to improve localization
-        self.n_particles = 5000
-        self.confidence_likelihood = 10 ** (1)  # Any particles with less likelihood will be replaced by random ones
-        self.default_likelihood = 1 / self.n_particles  # The default likelihood for new random particles
-        self.invalid_threshold = 0.9  # The min proportion of valid laser points to consider a state in the likelihood calculation
-        self.localization_threshold = 0.9  # The proportion of equal particles to assume that the location has been found
+        self.n_particles = 3000  # Number of particles
+        self.confidence_likelihood = 10 ** (-5)  # Any particles with less likelihood have a chance of being replaced by random ones
+        self.min_likelihood = 10 ** (-15)  # Minimum value of likelihood to consider a particle
+        self.likelihood_range = self.confidence_likelihood - self.min_likelihood  # Likelihood range for partially valuable particles
+        self.default_likelihood = self.confidence_likelihood - self.likelihood_range / 2  # Default likelihood for new random particles
+        self.invalid_threshold = 0.8  # Min proportion of valid laser points to consider a state in the likelihood calculation
+        self.localization_threshold = 0.995  # Proportion of equal particles to assume that the location has been found
 
     # Initialize connections
     def connections_init(self):
@@ -206,10 +215,12 @@ class ParticleFilter:
         # Replace unlikely particles with random ones
         for idx, state in enumerate(translated_states):
             if weights[idx] < self.confidence_likelihood:
-                rand = choices(self.free, k=1)[0]
-                translated_states[idx].position.x, translated_states[idx].position.y = rand.position.x, rand.position.y
-                translated_states[idx].orientation.z = uniform(0, 2 * np.pi - 1)
-                weights[idx] = self.default_likelihood
+                confidence = 1 - min((self.confidence_likelihood - weights[idx]) / self.likelihood_range, 1)
+                if random() >= confidence:  # Particle will be replaced
+                    rand = choices(self.free, k=1)[0]
+                    translated_states[idx].position.x, translated_states[idx].position.y = rand.position.x, rand.position.y
+                    translated_states[idx].orientation.z = uniform(0, 2 * np.pi - 1)
+                    weights[idx] = self.default_likelihood
 
         # Resampling using weights
         new_particles = []
@@ -219,6 +230,40 @@ class ParticleFilter:
             new_particle.orientation.z = p.orientation.z
             new_particles.append(new_particle)
         return new_particles
+
+    # Navigate reactively using walls as a reference
+    def reactive_navigation(self, scan):
+        # Valid laser measurements
+        valid_lasers = [l for l in scan.ranges if l < scan.range_max]
+
+        # Front laser distance
+        if len(valid_lasers) % 2:
+            front_distance = valid_lasers[int(len(valid_lasers) / 2)]
+        else:
+            left_front = valid_lasers[int(len(valid_lasers) / 2) - 1]
+            right_front = valid_lasers[int(len(valid_lasers) / 2)]
+            front_distance = (left_front + right_front) / 2
+
+        # If already rotating and front laser measures enough distance to move, stop rotating
+        if self.changing_direction and front_distance > self.free_distance:
+            self.changing_direction = False
+
+        # If front laser measures wall close enough or is already rotating, start/keep rotating
+        if self.changing_direction or front_distance < self.blocked_distance:
+            self.changing_direction = True
+            self.speed_msg.linear.x = 0
+            self.speed_msg.angular.z = self.angular_speed
+            self.right_distances.clear()
+            return
+
+        # Rightmost laser distance (with smoother transitions)
+        self.right_distances.append(valid_lasers[0])
+        right_distance = sum(self.right_distances) / len(self.right_distances)
+
+        # Reactive tracking of right wall distance
+        self.speed_msg.linear.x = self.linear_speed
+        self.wall_tracker.pub_state(right_distance)
+        self.speed_msg.angular.z = self.wall_tracker.speed
 
     # Main loop
     def run(self):
@@ -259,12 +304,10 @@ class ParticleFilter:
                 self.location_pub.publish(location)
                 # TODO: play sound to say that the robot has located itself (sound play)
             else:
-                self.speed_msg.linear.x = self.linear_speed
-                self.speed_msg.angular.z = self.angular_speed
+                self.reactive_navigation(self.sensor)
                 self.cmd_vel_mux_pub.publish(self.speed_msg)
                 self.timer = time()
                 rospy.sleep(0.2)
-                # TODO: better movement
 
 
 # Run particle filter

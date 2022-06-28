@@ -30,10 +30,10 @@ class Scan2PointCloud():
     def connections_init(self):
         self.pub_pcl = rospy.Publisher('/lidar_points', PointCloud, queue_size=5)
         rospy.Subscriber('/scan', LaserScan, self.laser_scan_hd, queue_size=1)
+        rospy.Subscriber('/real_pose_pix', Pose, self.set_real_pose)
 
     # Set laser measurements
     def laser_scan_hd(self, scan):
-        self.update_real_pose_pix()
         num_angles = int((scan.angle_max - scan.angle_min) / scan.angle_increment)
         angles = np.linspace(scan.angle_min, scan.angle_max, num_angles)
         point_cloud = PointCloud()
@@ -51,11 +51,10 @@ class Scan2PointCloud():
         self.pub_pcl.publish(point_cloud)
 
     # Update position with real pose
-    def update_real_pose_pix(self):
-        real_pose_pix_data = rospy.wait_for_message('/real_pose_pix', Pose, timeout=3)
-        self.robot_x_pix = int(real_pose_pix_data.position.x)
-        self.robot_y_pix = int(real_pose_pix_data.position.y)
-        self.robot_ang = real_pose_pix_data.orientation.z
+    def set_real_pose(self, pose):
+        self.robot_x_pix = int(pose.position.x)
+        self.robot_y_pix = int(pose.position.y)
+        self.robot_ang = pose.orientation.z
 
 
 # Obtain laser measurements

@@ -32,11 +32,13 @@ class DisplayState():
     # Initialize connections
     def connections_init(self):
         self.pub_map = rospy.Publisher('/img_map', Image, queue_size=10)
+        rospy.sleep(1)
         rospy.Subscriber('/map', OccupancyGrid, self.set_map)
         rospy.Subscriber('/lidar_points', PointCloud, self.show_pointcloud)
         rospy.Subscriber('/location', Pose, self.set_location)
         rospy.Subscriber('/show_map', Empty, self.show_map)
         rospy.Subscriber('/particles', PoseArray, self.set_particles)
+        rospy.Subscriber('/real_pose_pix', Pose, self.draw_map.set_real_pose)
 
     # Create map image
     def set_map(self, map):
@@ -53,7 +55,6 @@ class DisplayState():
     def show_pointcloud(self, pointcloud):
         points = pointcloud.points
         map_copy = self.map.copy()
-        self.draw_map.update_real_pose_pix()
         map_copy = self.draw_map.draw_robot(map_copy)
         if self.location:
             self.draw_map.draw_location(map_copy, self.location, self.location_pix)
@@ -64,7 +65,6 @@ class DisplayState():
     # Show map
     def show_map(self):
         map_copy = self.map.copy()
-        self.draw_map.update_real_pose_pix()
         map_copy = self.draw_map.draw_robot(map_copy)
         img_msg = self.bridge.cv2_to_imgmsg(map_copy, 'bgr8')
         self.pub_map.publish(img_msg)
@@ -112,12 +112,11 @@ class DrawState():
         self.robot_y_pix = 0
         self.robot_ang = 0
 
-    # Update robot position
-    def update_real_pose_pix(self):
-        real_pose_pix_data = rospy.wait_for_message('/real_pose_pix', Pose, timeout=3)
-        self.robot_x_pix = int(real_pose_pix_data.position.x)
-        self.robot_y_pix = int(real_pose_pix_data.position.y)
-        self.robot_ang = real_pose_pix_data.orientation.z
+    # Set real pose of the robot
+    def set_real_pose(self, pose):
+        self.robot_x_pix = int(pose.position.x)
+        self.robot_y_pix = int(pose.position.y)
+        self.robot_ang = pose.orientation.z
 
     # Draw robot
     def draw_robot(self, map):

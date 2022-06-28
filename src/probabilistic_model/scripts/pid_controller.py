@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from std_msgs.msg import Float64
+from std_msgs.msg import Bool, Float64
 
 # PID Controller Wrapper
 class PIDController:
@@ -15,6 +15,9 @@ class PIDController:
         self.state = rospy.Publisher(f'/{topic}/state', Float64, queue_size=1)
         while not rospy.is_shutdown() and self.state.get_num_connections() == 0:
             rospy.sleep(0.2)
+
+        # Enabled/Disabled
+        self.enabled = rospy.Publisher(f'/{topic}/pid_enable', Bool, queue_size=1)
 
         # Actuation value
         rospy.Subscriber(f'/{topic}/control_effort', Float64, self.actuation)
@@ -32,3 +35,11 @@ class PIDController:
     # Receive actuation value
     def actuation(self, data):
         self.speed = float(data.data)
+
+    # Disable controller
+    def disable(self):
+        self.enabled.publish(Bool(False))
+
+    # Enable controller
+    def enable(self):
+        self.enabled.publish(Bool(True))

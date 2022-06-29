@@ -67,7 +67,7 @@ class ParticleFilter:
         self.z_max = 0.001  # Weight for the error component of the likelihood calculation
 
         # Particle filter parameters
-        self.n_particles = 1500  # Number of particles
+        self.n_particles = 2500  # Number of particles
         self.confidence_likelihood = 10 ** (-80)  # Any particles with less likelihood will be replaced by random ones
         self.default_likelihood = 10 ** (-95)  # Default likelihood for new random particles
         self.invalid_threshold = 0.9  # Min proportion of valid laser points to consider a state in the likelihood calculation

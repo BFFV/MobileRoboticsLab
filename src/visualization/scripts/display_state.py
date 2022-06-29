@@ -32,7 +32,6 @@ class DisplayState():
     # Initialize connections
     def connections_init(self):
         self.pub_map = rospy.Publisher('/img_map', Image, queue_size=10)
-        rospy.sleep(1)
         rospy.Subscriber('/map', OccupancyGrid, self.set_map)
         rospy.Subscriber('/lidar_points', PointCloud, self.show_pointcloud)
         rospy.Subscriber('/location', Pose, self.set_location)
@@ -53,6 +52,8 @@ class DisplayState():
 
     # Show laser points in the map
     def show_pointcloud(self, pointcloud):
+        if self.map is None:
+            return
         points = pointcloud.points
         map_copy = self.map.copy()
         map_copy = self.draw_map.draw_robot(map_copy)
@@ -73,7 +74,8 @@ class DisplayState():
     def set_location(self, location):
         self.location_pix = (int(location.position.x), int(location.position.y))
         self.location = (round(location.position.x * self.resolution, 2),
-                         round((270 - location.position.y) * self.resolution, 2))
+                         round((270 - location.position.y) * self.resolution, 2),
+                         round(location.orientation.z, 2))
 
     # Show particles in the map
     def set_particles(self, particle_data):
@@ -144,10 +146,10 @@ class DrawState():
 
     # Draw current location
     def draw_location(self, map, pose, pose_pix):
-        x, y = pose
+        x, y, angle = pose
         font = cv2.FONT_HERSHEY_SIMPLEX
         cv2.putText(map, 'Localization Done', (102, 30), font, 0.6, self.text_color, 1, cv2.LINE_AA)
-        cv2.putText(map, f'({x}, {y})', (110, 60), font, 0.6, self.text_color, 1, cv2.LINE_AA)
+        cv2.putText(map, f'({x}, {y}, {angle})', (110, 60), font, 0.5, self.text_color, 1, cv2.LINE_AA)
         cv2.circle(map, (pose_pix[0], pose_pix[1]), self.location_radius_pix, self.location_color, thickness=2)
 
     # Draw current particles

@@ -27,8 +27,8 @@ class ParticleFilter:
     # Initialize variables
     def variables_init(self):
         # Actuation
-        self.default_linear_speed = 0.2  # Linear speed when following wall
-        self.default_angular_speed = 1.0  # Angular speed when changing direction
+        self.default_linear_speed = 0.4  # Linear speed when following wall
+        self.default_angular_speed = 3.0  # Angular speed when changing direction
         self.test_angular_speed = 6.0  # Angular speed when testing angles for candidate
         self.linear_speed = 0  # Current linear speed
         self.angular_speed = 0  # Current angular speed
@@ -38,7 +38,8 @@ class ParticleFilter:
         self.changing_direction = False  # True if the robot is in the changing direction subroutine
         self.free_distance = 0.7  # Distance limit required to stop changing direction and start moving again
         self.blocked_distance = 0.4  # Distance limit to stop moving and start changing direction
-        self.wall_distance = 0.7  # Desired distance to the right wall when navigating
+        self.side_blocked_distance = 0.3  # Distance limit to stop moving and start changing direction (from the side lasers)
+        self.wall_distance = 0.6  # Desired distance to the right wall when navigating
         self.wall_tracker = PIDController('wall_tracker')  # PID controller for navigation
         self.wall_tracker.pub_set_point(self.wall_distance)
         self.right_distances = deque(maxlen=5)  # The 'x' most recent distances to the right wall
@@ -56,19 +57,20 @@ class ParticleFilter:
         self.candidate = None  # Current candidate for the location
         self.checking = False  # True if the robot is checking a candidate
         self.angles_tested = 0  # Angles used to test the candidate
+        self.localization_threshold = 0.9  # Proportion of cluster of particles to assume convergence
+        self.cluster_distance = 15  # Distance in pixels to consider particles as a part of the cluster
 
         # Sensor
         self.sensor = None  # Sensor measurements
-        self.z_hit = 13  # Weight for the gaussian component of the likelihood calculation
+        self.z_hit = 10  # Weight for the gaussian component of the likelihood calculation
         self.z_random = 0  # Weight for the random noise component of the likelihood calculation
         self.z_max = 0.001  # Weight for the error component of the likelihood calculation
 
         # Particle filter parameters
-        self.n_particles = 2000  # Number of particles
-        self.confidence_likelihood = 10 ** (-3)  # Any particles with less likelihood will be replaced by random ones
-        self.default_likelihood = 10 ** (-15)  # Default likelihood for new random particles
+        self.n_particles = 1500  # Number of particles
+        self.confidence_likelihood = 10 ** (-80)  # Any particles with less likelihood will be replaced by random ones
+        self.default_likelihood = 10 ** (-95)  # Default likelihood for new random particles
         self.invalid_threshold = 0.9  # Min proportion of valid laser points to consider a state in the likelihood calculation
-        self.localization_threshold = 0.9  # Proportion of equal particles to assume convergence
 
         # Soundplay
         self.sound_handler = SoundClient()
@@ -89,6 +91,11 @@ class ParticleFilter:
 
         # Read sensor data
         rospy.Subscriber('/scan', LaserScan, self.set_sensor_data, queue_size=1)
+
+    # Calculate distance between two points
+    @staticmethod
+    def distance(a, b):
+        return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
     # Detect if a pixel is an obstacle edge
     def is_obstacle_edge(self, pixel, map):
@@ -259,12 +266,15 @@ class ParticleFilter:
         right_distance = min(self.right_distances)
         self.wall_tracker.pub_state(right_distance)
 
+        # Side laser distance
+        side_distance = min(valid_lasers[0], valid_lasers[-1])
+
         # If already rotating and front laser measures enough distance to move, stop rotating
         if self.changing_direction and front_distance > self.free_distance:
             self.changing_direction = False
 
         # If front laser measures wall close enough or is already rotating, start/keep rotating
-        if self.changing_direction or front_distance < self.blocked_distance:
+        if self.changing_direction or front_distance < self.blocked_distance or side_distance < self.side_blocked_distance:
             self.changing_direction = True
             self.linear_speed = 0
             self.angular_speed = self.default_angular_speed
@@ -287,9 +297,10 @@ class ParticleFilter:
             return
 
         # Try next angle
-        ideal_angle = abs(self.test_angular_speed) * self.action_time
-        angular = max(np.random.normal(ideal_angle * 0.92, ideal_angle * 0.35), 0)
+        angular = 1.15  # Tested
         self.angles_tested += angular
+        self.candidate[2] += angular
+        self.candidate[2] %= 2 * np.pi
 
         # Rotate to try different angles
         self.linear_speed = 0
@@ -329,13 +340,19 @@ class ParticleFilter:
             self.particles_pub.publish(PoseArray(poses=particles))
 
             # Check if the particles have converged
-            location, count = Counter([(p.position.x, p.position.y) for p in particles]).most_common(1)[0]
+            ordered_candidates = Counter([(p.position.x, p.position.y) for p in particles]).most_common()
+            location, count = ordered_candidates[0]
+            for loc, c in ordered_candidates[1:]:
+                if self.distance(location, loc) > self.cluster_distance:
+                    break
+                count += c
             converged = count >= self.localization_threshold * self.n_particles
             if not self.checking and converged:
-                self.candidate = location
+                angle, _ = Counter([p.orientation.z for p in particles if (p.position.x, p.position.y) == location]).most_common(1)[0]
+                self.candidate = [location[0], location[1], angle]
                 self.checking = True
                 self.angles_tested = 0
-            elif self.checking and (not converged or location != self.candidate):
+            elif self.checking and (not converged or list(location) != self.candidate[:2]):
                 self.candidate = None
 
             # Navigation
@@ -359,7 +376,7 @@ class ParticleFilter:
 
         # Display robot localization
         location = Pose()
-        location.position.x, location.position.y = self.candidate
+        location.position.x, location.position.y, location.orientation.z = self.candidate
         self.location_pub.publish(location)
         self.sound_handler.say('Robot Localized!', voice='voice_kal_diphone', volume=1.0)
 

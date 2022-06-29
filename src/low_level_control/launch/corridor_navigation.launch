@@ -14,11 +14,11 @@
     </node>
     -->
     <node pkg="low_level_control" name="corridor_navigation" type="corridor_navigation.py" output="screen"/>
-    <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/camera/depth/image_raw"/> -->
+    <!-- <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/camera/depth/image_raw"/> --> -->
 
     <!--PID Controller-->
     <node name="angle_controller" pkg="pid" type="controller" ns="wall_follower">
-        <param name="Kp" value="1"/>
+        <param name="Kp" value="1.3"/>
         <param name="upper_limit" value="0.9"/>
         <param name="lower_limit" value="-0.9"/>
         <param name="angle_error" value="true"/>  <!--keep the error between -pi and pi-->

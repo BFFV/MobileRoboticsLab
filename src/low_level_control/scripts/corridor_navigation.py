@@ -28,15 +28,15 @@ class CorridorNavigator:
 
     def wall_distance_cb(self, distances):
         distances = [self.MISSING_WALL_DISTANCE if d == -1 else d for d in distances.data]
-        distance_left, distance_right = distances
-        if distance_left == distance_right == self.MISSING_WALL_DISTANCE:
-            self.stop = True
-            return
-        self.stop = False
+        distance_left, distance_right, stop = distances
+        # if distance_left == distance_right == self.MISSING_WALL_DISTANCE:
+        #     self.stop = True
+        #     return
+        self.stop = stop == 1
         diff = distance_right - distance_left
         self.angle_controller.pub_state(diff)
 
-    def apply_velocity(self, linear=0.0, angular=0):
+    def apply_velocity(self, linear=0.1, angular=0):
         speed_msg = Twist()
         speed_msg.linear.x = linear if not self.stop else 0
         speed_msg.angular.z = angular

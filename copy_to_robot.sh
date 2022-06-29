@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rsync -azvh --exclude build --exclude devel --exclude docs * grupo7@192.168.1.129:~/g7_project
+rsync -azvh -e 'ssh -o ControlPath=none' --exclude build --exclude devel --exclude docs * grupo7@192.168.1.129:~/g7_project
 
 [ $? -eq 0 ] && echo "Copied to Robot!"
 

@@ -1,0 +1,12 @@
+<launch>
+    <!--Simulator-->
+    <node pkg="very_simple_robot_simulator" name="kobuki_simulator" type="kobuki_simulator.py"/>
+    <node pkg="very_simple_robot_simulator" name="lidar_simulator" type="lidar_simulator">
+        <param name="effective_hfov" type="int" value="181"/>
+        <param name="view_depth" type="double" value="20.0"/>
+    </node>
+
+    <!--Map-->
+    <arg name="map_file" default="$(find proyecto_grupo_7_2022)/maps/mapa_bodega.yaml"/>
+    <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)"/>
+</launch>

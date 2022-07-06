@@ -1,0 +1,5 @@
+<launch>
+    <!--Demo
+    <node pkg="proyecto_grupo_7_2022" name="demo" type="INSERT_SCRIPT_NAME (ex: nav_stack_demo.py)"/>
+    -->
+</launch>

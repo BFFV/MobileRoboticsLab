@@ -1,6 +1,6 @@
 <launch>
     <!--Simulator-->
-    <node pkg="very_simple_robot_simulator" name="kobuki_simulator" type="kobuki_simulator.py"/>
+    <node pkg="very_simple_robot_simulator" name="kobuki_simulator" type="kobuki_simulator"/>
     <node pkg="very_simple_robot_simulator" name="lidar_simulator" type="lidar_simulator">
         <param name="effective_hfov" type="int" value="181"/>
         <param name="view_depth" type="double" value="20.0"/>
@@ -9,4 +9,32 @@
     <!--Map-->
     <arg name="map_file" default="$(find proyecto_grupo_7_2022)/maps/mapa_bodega.yaml"/>
     <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)"/>
+
+    <!--Transform-->
+    <node pkg="tf" name="lidar_transform" type="static_transform_publisher" args="0 0 0 0 0 0 link1_parent link1 100"/>
+
+    <!--Visualization-->
+    <node pkg="rviz" name="visualizer" type="rviz" args="-d $(find proyecto_grupo_7_2022)/rviz/rviz_setup.rviz"/>
+
+    <!--Localization-->
+    <node pkg="amcl" name="localization" type="amcl">
+        <param name="odom_model_type" type="str" value="diff"/>
+        <param name="use_map_topic" type="bool" value="true"/>
+        <param name="initial_pose_x" type="double" value="5.325"/>
+        <param name="initial_pose_y" type="double" value="0.814"/>
+        <param name="initial_pose_a" type="double" value="1.570"/>
+        <param name="laser_max_beams" type="int" value="181"/>
+        <param name="min_particles" type="int" value="250"/>
+    </node>
+
+    <!--Navigation-->
+    <node pkg="move_base" name="nav_stack" type="move_base">
+        <param name="controller_frequency" type="double" value="5.0"/>
+        <rosparam file="$(find proyecto_grupo_7_2022)/param/costmap_common_params.yaml" command="load" ns="global_costmap"/>
+        <rosparam file="$(find proyecto_grupo_7_2022)/param/costmap_common_params.yaml" command="load" ns="local_costmap"/>
+        <rosparam file="$(find proyecto_grupo_7_2022)/param/local_costmap_params.yaml" command="load"/>
+        <rosparam file="$(find proyecto_grupo_7_2022)/param/global_costmap_params.yaml" command="load"/>
+        <rosparam file="$(find proyecto_grupo_7_2022)/param/dwa_local_planner_params.yaml" command="load"/>
+        <rosparam file="$(find proyecto_grupo_7_2022)/param/move_base_params.yaml" command="load"/>
+    </node>
 </launch>

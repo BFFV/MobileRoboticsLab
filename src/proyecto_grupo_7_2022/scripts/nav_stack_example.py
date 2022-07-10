@@ -2,32 +2,71 @@
 
 import rospy
 import actionlib
-from geometry_msgs.msg import Pose
+from std_msgs.msg import Header, Float32
+from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, PoseWithCovariance
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
+# Corridor reactive navigation
+class StackDemo:
+    RATE_HZ = 10
+    
+    def __init__(self):
+        rospy.init_node('nav_stack')
+        self.rate = rospy.Rate(self.RATE_HZ)
+        self.initial_pose_pub = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
+        self.move_base_client = actionlib.SimpleActionClient('/move_base', MoveBaseAction)
 
-def goal_done(status, result):
-    rospy.loginfo('DONE status: %s (%s)', move_base_client.get_goal_status_text(), str(status))
+    
+    def run(self):
+        self.move_base_client.wait_for_server()
+        self.set_initial_pose(2.1, 3.2, 0.1)
+         
+        self.move_to_pose([
+            (24, 3.5, 0.99),
+            (25, 16, 0.018),
+            (8, 16, 0.54),
+            (2.1, 3.2, 0.4)
+        ]) 
+    
+    def move_to_pose(self, pose_array):
+        if not pose_array: return
+        
+        x, y, theta = pose_array[0]
+        
+        # # TODO: Define a goal pose
+        goal_pose = Pose()
+        goal_pose.position.x, goal_pose.position.y = x, y
+        goal_pose.orientation.w = theta
 
+        # # TODO: Define MoveBaseGoal (ROS ActionLib API)
+        move_base_goal = MoveBaseGoal()
+        move_base_goal.target_pose.header.frame_id = 'map'
+        move_base_goal.target_pose.header.stamp = rospy.get_rostime()    
+        move_base_goal.target_pose.pose = goal_pose
 
-if __name__ == '__main__':
-    rospy.init_node('nav_stack_example')
+        def next_call(status, result):
+            rospy.loginfo('DONE status: %s (%s)', self.move_base_client.get_goal_status_text(), str(status))        
+            self.move_to_pose(pose_array[1:])
+        
+        self.move_base_client.send_goal(move_base_goal, done_cb=next_call)
+        
+        
+    def set_initial_pose(self, x, y, theta):
+        initial_pose = Pose()
+        initial_pose.position.x, initial_pose.position.y = x, y
+        initial_pose.orientation.w = theta
+        pose_w_cov_s = PoseWithCovarianceStamped()
+        pose_w_cov_s.pose.pose = initial_pose
+        header = Header()
+        header.frame_id = 'map'
+        header.stamp = rospy.get_rostime()    
+        pose_w_cov_s.header = header
+        self.initial_pose_pub.publish(pose_w_cov_s)
+    
 
-    # TODO: MoveBaseAction needs to be defined (ROS ActionLib API)
-    move_base_client = actionlib.SimpleActionClient('/move_base', MoveBaseAction)
-    move_base_client.wait_for_server()
-
-    # TODO: Publish to /initialpose topic to set the starting point for the robot (only once)
-
-    # TODO: Define a goal pose
-    goal_pose = Pose(position, orientation)
-
-    # TODO: Define MoveBaseGoal (ROS ActionLib API)
-    move_base_goal = MoveBaseGoal()
-    move_base_goal.target_pose.header.frame_id = 'map'
-    move_base_goal.target_pose.header.stamp = rospy.Time.now()
-    move_base_goal.target_pose.pose = goal_pose
-    move_base_client.send_goal(move_base_goal, done_cb=goal_done)
-
-    # TODO: Repeat for 3 goal poses sequentially
-
+# Navigate corridor
+if __name__ == "__main__":
+    navigator = StackDemo()
+    rospy.sleep(0.4)
+    navigator.run()
     rospy.spin()
